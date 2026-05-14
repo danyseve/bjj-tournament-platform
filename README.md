@@ -29,8 +29,7 @@ Tournament        Integration            Tatami 1-6
 Management        Layer
      |
 PostgreSQL
-
-
+```
 # 00 - Visión del proyecto
 
 ## Resumen
@@ -72,3 +71,4 @@ El MVP debe permitir:
 4. mostrar los nombres de los competidores en el scoreboard;
 5. registrar resultados;
 6. sincronizar resultados con Bracket en una fase posterior.
+
