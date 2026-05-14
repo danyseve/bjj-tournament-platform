@@ -1,0 +1,6 @@
+[submodule "services/bracket"]
+	path = services/bracket
+	url = https://github.com/danyseve/bracket.git
+[submodule "services/scoreboard"]
+	path = services/scoreboard
+	url = https://github.com/danyseve/BJJ-Scoreboard.git

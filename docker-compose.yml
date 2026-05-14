@@ -1,0 +1,115 @@
+services:
+  bracket-postgres:
+    image: postgres:16
+    container_name: bracket-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bracket_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-bracket_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - bracket_postgres_data:/var/lib/postgresql/data
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  bracket:
+    image: ghcr.io/evroon/bracket:latest
+    container_name: bracket
+    depends_on:
+      - bracket-postgres
+    ports:
+      - "${BRACKET_PORT:-8400}:8400"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bracket_dev}:${POSTGRES_PASSWORD:-change_me}@bracket-postgres:5432/${POSTGRES_DB:-bracket_dev}
+      SERVE_FRONTEND: "true"
+      API_PREFIX: "/api"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  bridge-api:
+    build:
+      context: ./bridge-api
+    container_name: bjj-bridge-api
+    depends_on:
+      - bracket
+    ports:
+      - "${BRIDGE_PORT:-8500}:8500"
+    environment:
+      BRACKET_API_URL: http://bracket:8400/api
+      SCOREBOARD_TATAMI_1_URL: http://scoreboard-tatami-1:3000
+      SCOREBOARD_TATAMI_2_URL: http://scoreboard-tatami-2:3000
+      SCOREBOARD_TATAMI_3_URL: http://scoreboard-tatami-3:3000
+      SCOREBOARD_TATAMI_4_URL: http://scoreboard-tatami-4:3000
+      SCOREBOARD_TATAMI_5_URL: http://scoreboard-tatami-5:3000
+      SCOREBOARD_TATAMI_6_URL: http://scoreboard-tatami-6:3000
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  scoreboard-tatami-1:
+    build:
+      context: ./services/scoreboard
+    container_name: scoreboard-tatami-1
+    ports:
+      - "${SCOREBOARD_TATAMI_1_PORT:-3001}:3000"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  scoreboard-tatami-2:
+    build:
+      context: ./services/scoreboard
+    container_name: scoreboard-tatami-2
+    ports:
+      - "${SCOREBOARD_TATAMI_2_PORT:-3002}:3000"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  scoreboard-tatami-3:
+    build:
+      context: ./services/scoreboard
+    container_name: scoreboard-tatami-3
+    ports:
+      - "${SCOREBOARD_TATAMI_3_PORT:-3003}:3000"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  scoreboard-tatami-4:
+    build:
+      context: ./services/scoreboard
+    container_name: scoreboard-tatami-4
+    ports:
+      - "${SCOREBOARD_TATAMI_4_PORT:-3004}:3000"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  scoreboard-tatami-5:
+    build:
+      context: ./services/scoreboard
+    container_name: scoreboard-tatami-5
+    ports:
+      - "${SCOREBOARD_TATAMI_5_PORT:-3005}:3000"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+  scoreboard-tatami-6:
+    build:
+      context: ./services/scoreboard
+    container_name: scoreboard-tatami-6
+    ports:
+      - "${SCOREBOARD_TATAMI_6_PORT:-3006}:3000"
+    networks:
+      - bjj-net
+    restart: unless-stopped
+
+volumes:
+  bracket_postgres_data:
+
+networks:
+  bjj-net:
+    driver: bridge

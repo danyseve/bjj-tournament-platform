@@ -1,0 +1,10 @@
+# Production compose placeholder.
+# This file will be used for Oracle Cloud A1 deployment.
+#
+# Pending:
+# - Nginx reverse proxy
+# - WireGuard access
+# - restricted exposed ports
+# - PostgreSQL backups
+# - production secrets
+# - persistent volumes
