@@ -40,7 +40,6 @@ Usar:
 
 
 
-
 ## Validación real desde cliente macOS
 
 Prueba de salida pública:
