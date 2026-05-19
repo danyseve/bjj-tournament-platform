@@ -1,3 +1,9 @@
+# Local backup files
+*.BCK
+*BCK
+*.bak
+*.backup
+
 # Environment files
 .env
 .env.local
@@ -41,3 +47,9 @@ Thumbs.db
 *.p12
 *.ovpn
 wg0.conf
+
+# WireGuard secrets
+#wg0.conf
+#*.key
+#*.pem
+#*.crt
