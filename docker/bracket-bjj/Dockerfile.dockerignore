@@ -1,0 +1,93 @@
+# =============================================================================
+# Exclusiones del contexto de build para docker/bracket-bjj/Dockerfile  (P1.2b)
+# =============================================================================
+# BuildKit lee este fichero por estar junto al Dockerfile que lo referencia
+# (<ruta-del-Dockerfile>.dockerignore).  El builder clasico NO lo usa.
+#
+# El contexto de build es la RAIZ del repositorio, donde viven `.env`, `.git`
+# y los backups: por eso este fichero es obligatorio, no opcional.
+#
+# Los paths que el Dockerfile SI necesita
+#   - services/bracket/frontend/   (frontend: package.json + pnpm-lock + src + public)
+#   - services/bracket/backend/    (backend: pyproject + uv.lock + bracket/ + alembic + static)
+# NO quedan excluidos por ningun patron de este fichero (verificado en la
+# validacion del cambio: solo se excluyen dotfiles concretos y artefactos).
+# =============================================================================
+
+# --- 1. Secretos: nunca deben entrar en el contexto ni en la imagen ---------
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+#  Esto excluye tambien services/bracket/frontend/.env.development (fichero
+#  versionado del upstream, solo claves publicas de analytics/hcaptcha).  Es
+#  intencionado y no altera el build: `vite build` en modo production lee
+#  unicamente `.env` y `.env.production`, nunca `.env.development`.
+
+# --- 2. Control de versiones y metadatos ------------------------------------
+.git
+**/.git
+**/.git/**
+.gitmodules
+#  Nota: NO se excluye ningun `.gitignore` del arbol (tampoco el de la raiz).
+#  Son ficheros versionados del upstream, no secretos, y mantener
+#  services/bracket/backend/static/.gitignore dentro del contexto garantiza que
+#  exista /app/static en la imagen, igual que hoy (app.py monta
+#  StaticFiles(directory="static")).
+
+# --- 3. Backups, volcados, datos y residuos ---------------------------------
+backups
+backups/**
+**/backups
+**/backups/**
+*.dump
+*.sql
+*.sql.gz
+*.tar
+*.tar.gz
+*.tgz
+*.bak
+*.old
+data
+data/**
+
+# --- 4. Artefactos de build y caches ----------------------------------------
+**/node_modules
+**/dist
+**/build
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.cache
+**/.coverage
+**/.idea
+**/.vscode
+
+# --- 5. Fuera del alcance de esta imagen ------------------------------------
+services/scoreboard
+services/scoreboard/**
+bridge-api
+bridge-api/**
+nginx
+nginx/**
+wireguard
+wireguard/**
+scripts
+scripts/**
+docker-compose.yml
+docker-compose.prod.yml
+
+# --- 6. Documentacion y ruido ---------------------------(no afecta al build)-
+docs
+docs/**
+README.md
+LICENSE
