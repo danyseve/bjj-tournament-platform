@@ -1,14 +1,19 @@
 # syntax=docker/dockerfile:1.7
 #
-# Bracket — imagen propia reproducible (P1.2b, revision r1)
+# Bracket — imagen propia reproducible (P1.2b, revision r3)
 # =============================================================================
 # Receta propia que sustituye a la imagen legacy parcheada con `sed`
 # (ver docker/bracket-bjj/Dockerfile.legacy y docs/06-imagen-custom-bracket.md).
 #
 # Contexto de build: RAIZ del repositorio bjj-tournament-platform
-#   docker build -f docker/bracket-bjj/Dockerfile -t danyseve1/bracket-bjj:e6abd7d-r1 .
+#   docker build -f docker/bracket-bjj/Dockerfile -t danyseve1/bracket-bjj:e6abd7d-r3 .
 #
-# NO construida todavia en r1: este fichero se versiona sin ejecutar build.
+# Revisiones de la receta:
+#   r1  receta multi-etapa propia (pines, hashes de lockfiles, usuario no root)
+#   r2  elimina el unico fichero real world-writable horneado (/app/.venv/.lock)
+#   r3  mueve la cache de uv a /tmp/uv-cache: el `.lock` que uv crea en runtime
+#       deja de aparecer bajo /app
+#
 # Las exclusiones del contexto estan en docker/bracket-bjj/Dockerfile.dockerignore
 # (requiere BuildKit; el builder clasico no lee ese fichero).
 #
@@ -99,7 +104,7 @@ ARG UV_LOCK_SHA256=24f99c8ebd6ea33363e2edaa971246c82af6e371eba3ad167c338333351df
 ARG PNPM_LOCK_SHA256=001f9b8ee4b410e82dc9f2296605469196b878306810c74e7f4f0bf87e4984af
 ARG PNPM_VERSION=9.15.9
 ARG BRACKET_UPSTREAM_COMMIT=e6abd7d282850f9d13d9122494767d4dbcb139ef
-ARG RECIPE_REVISION=r2
+ARG RECIPE_REVISION=r3
 
 # Dependencias primero (cacheable), codigo despues.
 COPY services/bracket/backend/uv.lock services/bracket/backend/pyproject.toml ./
@@ -121,24 +126,31 @@ RUN echo "${UV_LOCK_SHA256}  uv.lock" | sha256sum -c - \
 # Frontend ya compilado, en la ruta que espera app.py (frontend-dist relativo a WORKDIR)
 COPY --from=frontend /app/dist ./frontend-dist
 
-# HOME y cache de runtime con permisos minimos (nada de chmod 777)
+# HOME en /app (lo espera el codigo) y cache de uv FUERA de /app: con
+# UV_CACHE_DIR=/tmp/uv-cache (r3) el `.lock` que uv crea al arrancar cae en
+# /tmp y no deja entradas world-writable bajo /app. Nada de chmod 777.
 ENV HOME=/app \
-    UV_CACHE_DIR=/app/.cache/uv
+    UV_CACHE_DIR=/tmp/uv-cache
 
 # `app.py` monta StaticFiles(directory="static") al arrancar: el directorio debe
 # existir (la imagen legacy tambien lo tiene). `mkdir` lo garantiza aunque el
 # contexto de build no aporte ningun fichero en esa carpeta.
-RUN mkdir -p /app/static /app/.cache/uv \
- && chown -R bracket:bracket /app \
- && chmod 750 /app /app/.cache /app/.cache/uv
+# `/tmp/uv-cache` (r3): cache de uv en runtime, propietario bracket y modo 700
+# (solo su usuario); /app/.cache/uv se conserva por compatibilidad de rutas.
+RUN mkdir -p /app/static /app/.cache/uv /tmp/uv-cache \
+ && chown -R bracket:bracket /app /tmp/uv-cache \
+ && chmod 750 /app /app/.cache /app/.cache/uv \
+ && chmod 700 /tmp/uv-cache
 
-# --- r2: entradas world-writable REALES bajo /app ---------------------------
+# --- r2/r3: entradas world-writable REALES bajo /app ------------------------
 # `uv sync` crea `/app/.venv/.lock` con modo 0666. Los symlinks del venv tienen
 # modo 777, que es el estandar para symlinks y que el kernel ignora: no se tocan
 # y quedan excluidos de la comprobacion (`-type f -o -type d`).
 # Operacion explicita sobre ese unico fichero + guardia que falla el build si
 # aparece cualquier conjunto inesperado de entradas reales world-writable.
 # Sin chmod recursivo y sin cambios de propietario.
+# (r3 mueve ademas la cache de uv a /tmp/uv-cache para que el arranque no
+#  reintroduzca world-writables bajo /app.)
 RUN set -eu; \
     expected="/app/.venv/.lock"; \
     ww="$(find /app -xdev \( -type f -o -type d \) -perm -0002)"; \
@@ -155,7 +167,7 @@ RUN set -eu; \
         printf '%s\n' "$rest" | sed 's/^/  /' >&2; \
         exit 1; \
     fi; \
-    echo "OK r2: 0 ficheros reales world-writable bajo /app (symlinks 777 excluidos)"
+    echo "OK r3: 0 ficheros reales world-writable bajo /app (symlinks 777 excluidos)"
 
 LABEL org.opencontainers.image.title="bracket-bjj" \
       org.opencontainers.image.description="Bracket propio (backend+frontend) construido desde source" \
