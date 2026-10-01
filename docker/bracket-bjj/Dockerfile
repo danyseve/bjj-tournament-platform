@@ -99,7 +99,7 @@ ARG UV_LOCK_SHA256=24f99c8ebd6ea33363e2edaa971246c82af6e371eba3ad167c338333351df
 ARG PNPM_LOCK_SHA256=001f9b8ee4b410e82dc9f2296605469196b878306810c74e7f4f0bf87e4984af
 ARG PNPM_VERSION=9.15.9
 ARG BRACKET_UPSTREAM_COMMIT=e6abd7d282850f9d13d9122494767d4dbcb139ef
-ARG RECIPE_REVISION=r1
+ARG RECIPE_REVISION=r2
 
 # Dependencias primero (cacheable), codigo despues.
 COPY services/bracket/backend/uv.lock services/bracket/backend/pyproject.toml ./
@@ -131,6 +131,31 @@ ENV HOME=/app \
 RUN mkdir -p /app/static /app/.cache/uv \
  && chown -R bracket:bracket /app \
  && chmod 750 /app /app/.cache /app/.cache/uv
+
+# --- r2: entradas world-writable REALES bajo /app ---------------------------
+# `uv sync` crea `/app/.venv/.lock` con modo 0666. Los symlinks del venv tienen
+# modo 777, que es el estandar para symlinks y que el kernel ignora: no se tocan
+# y quedan excluidos de la comprobacion (`-type f -o -type d`).
+# Operacion explicita sobre ese unico fichero + guardia que falla el build si
+# aparece cualquier conjunto inesperado de entradas reales world-writable.
+# Sin chmod recursivo y sin cambios de propietario.
+RUN set -eu; \
+    expected="/app/.venv/.lock"; \
+    ww="$(find /app -xdev \( -type f -o -type d \) -perm -0002)"; \
+    unexpected="$(printf '%s\n' "$ww" | grep -vx "$expected" | grep -v '^$' || true)"; \
+    if [ -n "$unexpected" ]; then \
+        echo "ERROR: conjunto inesperado de entradas reales world-writable bajo /app:" >&2; \
+        printf '%s\n' "$unexpected" | sed 's/^/  /' >&2; \
+        exit 1; \
+    fi; \
+    if [ -e "$expected" ]; then chmod 640 "$expected"; fi; \
+    rest="$(find /app -xdev \( -type f -o -type d \) -perm -0002)"; \
+    if [ -n "$rest" ]; then \
+        echo "ERROR: siguen quedando entradas reales world-writable bajo /app:" >&2; \
+        printf '%s\n' "$rest" | sed 's/^/  /' >&2; \
+        exit 1; \
+    fi; \
+    echo "OK r2: 0 ficheros reales world-writable bajo /app (symlinks 777 excluidos)"
 
 LABEL org.opencontainers.image.title="bracket-bjj" \
       org.opencontainers.image.description="Bracket propio (backend+frontend) construido desde source" \
