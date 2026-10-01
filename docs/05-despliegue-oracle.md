@@ -3,11 +3,6 @@
 Runbook de despliegue de la plataforma BJJ. Principio general: **cambios pequeños, verificables y
 reversibles**, con prechecks, validación posterior y rollback definido.
 
-> Nota de nomenclatura: en `docs/` existen ficheros antiguos y **vacíos** con numeración que solapa
-> (`03-despliegue-local.md`, `04-despliegue-oracle-cloud.md`, `05-integracion-bridge-api.md`). Este
-> runbook es el vigente para despliegue en Oracle; la limpieza de esos ficheros queda pendiente y no se
-> hace en este cambio.
-
 Convenciones: **[READ-ONLY]** solo consulta · **[CAMBIO DE ESTADO]** requiere autorización explícita.
 
 Relacionado: [03-operacion](03-operacion.md) · [04-backup-restore](04-backup-restore.md) ·

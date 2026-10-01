@@ -1,7 +1,8 @@
 # ADR-004 - Reproducibilidad de la imagen de Bracket
 
 - Fecha: 2026-10-01
-- Estado: aceptado (decision temporal, revisable)
+- Estado: **Accepted / Implemented** (decisión temporal de P1.2a; su estrategia futura se ejecutó en P1.2b el
+  2026-10-01 — ver *Estado de implementación*)
 - Contexto tecnico: P1.2a. Detalle de la imagen y de la receta en `docs/06-imagen-custom-bracket.md`.
 
 ## Contexto
@@ -71,6 +72,38 @@ Sustituir la imagen derivada por un **build desde source** del submodulo, con re
    Nginx; SPA servida; base de API compilada = `/api`; mismos hashes en los ficheros de aplicacion.
 6. Alternativa a evaluar si se necesita divergir de upstream o construir en CI con procedencia:
    fork propio construido en CI.
+
+> Contexto histórico (P1.2a): los puntos 1–5 se describen aquí como plan. **Se ejecutaron** en P1.2b
+> (2026-10-01) con la receta `docker/bracket-bjj/Dockerfile` (revisión `r3`); ver *Estado de
+> implementación*.
+
+## Estado de implementación
+
+**Implementada** el **2026-10-01** (P1.2b): receta propia construida, validada en pila sombra y
+**desplegada en producción** por digest. P1.2 **CLOSED ✅**.
+
+| Dato | Valor |
+|---|---|
+| Upstream (submódulo `services/bracket`) | `e6abd7d282850f9d13d9122494767d4dbcb139ef` |
+| Recipe revision | `r3` |
+| Tag legible | `danyseve1/bracket-bjj:e6abd7d-r3` |
+| RepoDigest | `sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8` |
+| Image ID | `sha256:09b19930bde296aeb2d84851d67d91c61153599f166c92dfb68577c623e712df` |
+| Plataforma | `linux/arm64/v8` |
+| Usuario | **no-root** (`bracket`) |
+| Migraciones | `AUTO_RUN_MIGRATIONS=false` |
+| Caché de runtime | `UV_CACHE_DIR=/tmp/uv-cache` (`0700`) |
+| Parcheo de artefactos | **sin** `sed` (ni `config.py.bak`) y **sin** `chmod -R 777` (0 world-writables reales bajo `/app`) |
+
+- **Receta**: `docker/bracket-bjj/Dockerfile` multi-etapa (bases y lockfiles fijados; `VITE_API_BASE_URL=/api`
+  en build time); `Dockerfile.dockerignore` propio.
+- **Validación**: pila sombra aislada (red y volumen propios, PostgreSQL restaurado desde backup, usuario
+  de prueba) sin tocar producción — equivalencia funcional, Alembic `c1ab44651e79` y deriva de esquema 0.
+- **Producción**: `bracket` desplegado **por digest**; `healthy`, `restarts=0` y el resto de servicios
+  con sus mismos IDs; backup `pre-deploy-r3-20261001T184323Z` previo.
+- **Rollback conservado**: imagen legacy `danyseve1/bracket-bjj:0.1.0` (no se elimina).
+- **Detalle**: `docs/06-imagen-custom-bracket.md`, `docs/07-plan-imagen-reproducible.md`; operación y
+  despliegue en `docs/03-operacion.md`, `docs/04-backup-restore.md`, `docs/05-despliegue-oracle.md`.
 
 ## Rollback / no-impacto sobre runtime
 
