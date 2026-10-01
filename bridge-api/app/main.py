@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException
 
-from app.bracket_client import BracketClient
-from app.scoreboard_client import ScoreboardClient
-from app.models import AssignMatchRequest, MatchResultRequest
+from app.bracket_client import BracketClient, BracketError, locate_match, normalize_match
+from app.models import AssignMatchRequest, AssignMatchResponse
 
 app = FastAPI(
     title="BJJ Bridge API",
@@ -11,7 +10,6 @@ app = FastAPI(
 )
 
 bracket_client = BracketClient()
-scoreboard_client = ScoreboardClient()
 
 
 @app.get("/health")
@@ -38,43 +36,18 @@ async def health_bracket():
         )
 
 
-@app.post("/tatamis/{tatami_id}/assign-match")
+@app.post("/tatamis/{tatami_id}/assign-match", response_model=AssignMatchResponse)
 async def assign_match(tatami_id: int, payload: AssignMatchRequest):
-    if tatami_id != payload.tatami:
-        raise HTTPException(
-            status_code=400,
-            detail="Path tatami_id and payload tatami do not match",
-        )
-
+    if tatami_id != payload.tatami_id:
+        raise HTTPException(status_code=400, detail="Path and payload tatami_id must both be 1")
     try:
-        result = await scoreboard_client.assign_match(
-            tatami=tatami_id,
-            payload=payload.model_dump(),
-        )
-        return {
-            "status": "accepted",
-            "message": "Match assignment received",
-            "result": result,
-        }
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        stages = await bracket_client.fetch_stages(payload.tournament_id)
+        match, category = locate_match(stages, payload.tournament_id, payload.match_id)
+        return AssignMatchResponse(match=normalize_match(match, category, payload.tournament_id))
+    except BracketError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
 @app.post("/tatamis/{tatami_id}/result")
-async def submit_result(tatami_id: int, payload: MatchResultRequest):
-    if tatami_id != payload.tatami:
-        raise HTTPException(
-            status_code=400,
-            detail="Path tatami_id and payload tatami do not match",
-        )
-
-    result = await bracket_client.update_match_result(
-        match_id=payload.match_id,
-        payload=payload.model_dump(),
-    )
-
-    return {
-        "status": "accepted",
-        "message": "Result received",
-        "result": result,
-    }
+async def submit_result(tatami_id: int):
+    raise HTTPException(status_code=501, detail="Result submission is disabled in P2.3A; no writes are performed")
