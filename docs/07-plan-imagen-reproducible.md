@@ -1,13 +1,38 @@
 # 07 — Plan de imagen Bracket reproducible (P1.2b)
 
-Estado: **diseño + receta versionada, sin construir**. Este documento acompaña a
-`docker/bracket-bjj/Dockerfile` (receta propia, revision `r1`) y a
-`docker/bracket-bjj/Dockerfile.dockerignore`. No se ha ejecutado ningún `docker build`,
-`docker pull` ni cambio de runtime.
+Estado: **receta construida y validada (release candidate `r3`); pendiente de desplegar**.
+Este documento acompaña a `docker/bracket-bjj/Dockerfile` (receta propia, revision `r3`) y a
+`docker/bracket-bjj/Dockerfile.dockerignore`. Producción sigue intacta: la imagen validada
+**no** se ha desplegado (ver sección 14).
 
 Referencias: `docker/bracket-bjj/Dockerfile.legacy` (receta histórica parchada),
 `docs/06-imagen-custom-bracket.md` (qué se desplegó y por qué), y
 `docs/decisions/ADR-004-bracket-image-reproducibility.md` (decisión de estrategia).
+
+---
+
+## Validation status: RELEASE CANDIDATE
+
+Candidata final: **`danyseve1/bracket-bjj:e6abd7d-r3`** (revisión de receta `r3`),
+construida y validada el 2026-10-01 sobre una pila sombra con PostgreSQL restaurado
+(`127.0.0.1:18400`), sin tocar producción.
+
+| Comprobación | Estado |
+|---|---|
+| ARM64 | ✅ `linux/arm64` (builder nativo, sin QEMU) |
+| non-root | ✅ `User=bracket` (uid 100 / gid 101, usuario de sistema) |
+| healthcheck real | ✅ `/api/ping` (`--interval=30s --timeout=5s --retries=3 --start-period=20s`), `healthy` |
+| frontend `/api` | ✅ bundle sin `http://localhost:8400/api` (0 ocurrencias, verificado también servido) |
+| PostgreSQL shadow restore | ✅ dump `pre-p12b-20261001T180912Z` restaurado (15 tablas, 178 entradas TOC) |
+| API functional comparison | ✅ equivalencia funcional con producción (torneos, jugadores, combates, rounds/standings) |
+| schema drift = 0 | ✅ `pg_dump --schema-only` idéntico antes/después; alembic `c1ab44651e79` |
+| production untouched | ✅ los 4 contenedores con los mismos IDs, `StartedAt` y `restarts=0` |
+
+Detalle de permisos: **0 ficheros/directorios reales world-writable bajo `/app`** en build y
+en runtime; `/app/.venv/.lock` en `0640`; caché de uv en `/tmp/uv-cache` (modo `0700`,
+`bracket:bracket`) con su lock dinámico en `/tmp/uv-cache/.lock`; `BRACKET_PUBLIC_BASE_URL`
+eliminado definitivamente y `BASE_URL` **no** configurado (el campo no tiene consumidores
+funcionales en el código: única aparición, su definición en `config.py`).
 
 ---
 
@@ -74,7 +99,8 @@ en el rango ⇒ el submódulo es espejo de `upstream/master`).
 
 **Contingencia documentada (no ejecutada):** si la validación funcional falla por las
 dependencias nuevas, se aplica la **misma receta** sobre un `git worktree` del
-submódulo en `1522734d` (sin cambiar el gitlink), como revisión `r2` de contingencia.
+submódulo en `1522734d` (sin cambiar el gitlink), en una revisión de receta aparte
+(`e6abd7d-c1`; no se usa `r*`, reservado para las revisiones de nuestra receta).
 
 ---
 
@@ -106,7 +132,7 @@ Consulta de manifiestos (`docker manifest inspect`, solo metadatos, sin descarga
   formato usa el lockfile.
 - No se usa `pnpm@9.x.y` ni `apk add pnpm` (paquete sin versión, cambia con la versión de
   Alpine). pnpm 10.x también acepta `lockfileVersion 9.0`, pero es un salto de
-  comportamiento que en `r1` no es necesario: se evita.
+  comportamiento que en esta receta no es necesario: se evita.
 - Validación en el primer build: las dos comprobaciones SHA256 del lockfile (antes y
   después de `pnpm install --frozen-lockfile`) demuestran que el lockfile **no** se
   reescribe.
@@ -120,7 +146,7 @@ PNPM_LOCK_SHA256=001f9b8e…84af
 UV_LOCK_SHA256=24f99c8e…f242
 VITE_API_BASE_URL=/api
 BRACKET_UPSTREAM_COMMIT=e6abd7d282850f9d13d9122494767d4dbcb139ef
-RECIPE_REVISION=r1
+RECIPE_REVISION=r3
 ```
 
 ---
@@ -146,8 +172,16 @@ arm64**; el único consumidor es este host.
 Dos etapas, contexto = raíz del repo:
 
 ```
-docker build -f docker/bracket-bjj/Dockerfile -t danyseve1/bracket-bjj:e6abd7d-r1 .
+docker build -f docker/bracket-bjj/Dockerfile -t danyseve1/bracket-bjj:e6abd7d-r3 .
 ```
+
+Revisiones de la receta (mismo commit de submódulo, `RECIPE_REVISION` en el `ARG`):
+
+| Revisión | Cambio |
+|---|---|
+| `r1` | receta multi-etapa propia: pines por digest, SHA256 de lockfiles, usuario no root, healthcheck real, bundle sin `sed` |
+| `r2` | elimina el único fichero real world-writable horneado (`/app/.venv/.lock`, `0666`) con `chmod 640` y una guardia que **falla el build** si aparece un conjunto inesperado de entradas reales world-writable bajo `/app` |
+| `r3` | mueve la caché de uv a `/tmp/uv-cache` (`0700`, `bracket:bracket`): el `.lock` que `uv run` crea al arrancar deja de aparecer bajo `/app` (era el único world-writable en runtime) |
 
 Etapa 1 — frontend (`node:24-alpine` por digest):
 - `corepack enable` + `corepack prepare pnpm@9.15.9 --activate`;
@@ -155,15 +189,19 @@ Etapa 1 — frontend (`node:24-alpine` por digest):
   vuelve a verificar SHA256 (prueba de que el lockfile no se reescribe);
 - copia el resto del frontend y compila con `VITE_API_BASE_URL=/api` (variable de **build**);
 - **el build falla** si aparece `http://localhost:8400/api` en `dist` (sin `sed`).
+- (El `NODE_ENV=production` del upstream se activa **después** de `pnpm install`: con pnpm 9.15.9
+  antes de instalar, pnpm omitiría las devDependencies y `vite` no existiría → `vite: not found`.)
 
 Etapa 2 — runtime (`python:3.14-alpine3.22` por digest, `uv 0.9.19` por digest):
 - `uv sync --no-dev --locked --no-install-project` (dependencias) y después
   `uv sync --no-dev --locked` (con el código); SHA256 de `uv.lock` verificado antes y después;
-- **sin** parche de `config.py` y **sin** `BRACKET_PUBLIC_BASE_URL` (su motivo era un no-op);
+- **sin** parche de `config.py`, **sin** `BRACKET_PUBLIC_BASE_URL` (era un ARG de la receta
+  legacy con efecto nulo) y **sin** `BASE_URL` (el campo no tiene consumidores funcionales);
 - `dist` copiado a `/app/frontend-dist` (ruta que espera `app.py`);
-- usuario de sistema `bracket`, `HOME=/app`, `UV_CACHE_DIR=/app/.cache/uv` con modo 750;
-  ninguna ruta con permisos 777; cachés de compilación vía `--mount=type=cache` (no entran
-  en la imagen);
+- usuario de sistema `bracket`, `HOME=/app`, `UV_CACHE_DIR=/tmp/uv-cache` (`r3`) con modo `0700`
+  y propietario `bracket:bracket`; `/app/.venv/.lock` en `0640`; ninguna ruta con permisos 777;
+  guardia de world-writables en el build; cachés de compilación vía `--mount=type=cache`
+  (no entran en la imagen);
 - `EXPOSE 8400`; `HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=20s`
   sobre `wget -q -O - http://127.0.0.1:8400/api/ping | grep -q '"ping"'`;
 - `CMD` equivalente al actual: `uv run --no-dev --locked -- gunicorn -k uvicorn.workers.UvicornWorker bracket.app:app --bind 0.0.0.0:8400 --workers 1`;
@@ -191,13 +229,14 @@ defensa en profundidad).
 ## 7. Estrategia de tags
 
 ```
-danyseve1/bracket-bjj:e6abd7d-r1
+danyseve1/bracket-bjj:e6abd7d-r3   <- tag final validado (release candidate)
                  └──────┘ └┘
       commit del submódulo (7)  revisión propia de la receta
 ```
 
-- `e6abd7d` = commit del submódulo con el que se construyó; `r1` = primera revisión de
-  **nuestra** receta/ajustes. Sube a `r2`, `r3`… si cambia el Dockerfile, los pines o los
+- `e6abd7d` = commit del submódulo con el que se construyó; `r3` = revisión actual de
+  **nuestra** receta/ajustes (`r1` → receta inicial, `r2` → world-writable horneado, `r3` →
+  caché de uv fuera de `/app`). Sube a `r4`, `r5`… si cambia el Dockerfile, los pines o los
   args **sin** cambiar el commit del submódulo.
 - No hay versión semántica upstream utilizable (sin tags, `pyproject` dice `0.0.1`, el
   `v3.0.0-rc1` es un label viejo de la base) ⇒ el SHA es la referencia honesta. Si algún
@@ -216,7 +255,7 @@ danyseve1/bracket-bjj:e6abd7d-r1
 
 ```yaml
   bracket:
-    image: danyseve1/bracket-bjj:e6abd7d-r1      # tras publicar y validar -> @sha256:<digest>
+    image: danyseve1/bracket-bjj:e6abd7d-r3     # tras publicar -> @sha256:<digest> (ver sección 14)
     build:
       context: .
       dockerfile: docker/bracket-bjj/Dockerfile
@@ -259,27 +298,31 @@ danyseve1/bracket-bjj:e6abd7d-r1
 `auto_run_migrations = True` y `app.py` ejecuta alembic al arrancar; hoy no habría delta,
 pero es el accidente que hay que hacer imposible por diseño.
 
-Pila de prueba (efímera, red y volumen propios, **nunca** los de producción):
-1. Red `bjj-p12b-test` y volumen nuevo `p12b_pgdata`.
-2. `postgres:16` (por digest) con `POSTGRES_*` de prueba; restaurar ahí el dump del backup
-   (`pg_restore` del último `20261001T151041Z` o de uno nuevo `pre-p12b`). Los datos son
-   una **copia**.
+**Ejecutado el 2026-10-01** (pila sombra aislada; red y volumen propios, **nunca** los de
+producción):
+1. Red `bjj-p12b-test` y volumen nuevo `bjj-p12b-pgdata`.
+2. `postgres:16` como `bracket-p12b-postgres` (sin puerto publicado, credenciales de prueba
+   distintas de las de producción, guardadas fuera del repo en `/home/ubuntu/p12b-shadow/`),
+   con el dump del backup `pre-p12b-20261001T180912Z` restaurado (`pg_restore`, 178 entradas
+   TOC, 15 tablas). Los datos son una **copia**.
 3. Candidata como `bracket-p12b` con `PG_DSN` del postgres de prueba,
    **`AUTO_RUN_MIGRATIONS=false`**, `SERVE_FRONTEND=true`, `API_PREFIX=/api`, `JWT_SECRET` de
    prueba, y puerto publicado **solo en loopback**: `127.0.0.1:18400:8400`.
-4. Con `AUTO_RUN_MIGRATIONS=false`, la candidata no puede tocar esquema ni datos ajenos. Si
-   se quiere probar el camino de migración, se ejecuta a mano `alembic upgrade head` **contra
-   la copia** y se comprueba que no aplica nada (head ya es `c1ab44651e79`).
-5. Al terminar, eliminar **solo** los recursos `*-p12b*`. El proyecto `bjj-tournament-platform`
-   no se toca.
-6. Requisitos previos: backup `pre-p12b` protegido, imagen legacy conservada localmente
-   (`a773917e9c4b`, 4 tags) y autorización explícita (la prueba crea contenedores).
+4. Con `AUTO_RUN_MIGRATIONS=false`, la candidata no puede tocar esquema ni datos ajenos. La
+   prueba del camino de migración se hizo comprobando `alembic_version` en la **copia**
+   (head ya `c1ab44651e79`) y el `--schema-only` antes/después.
+5. La pila sombra **se conserva** hasta cerrar el despliegue (contenedores, volumen, red y
+   logs en `/home/ubuntu/p12b-shadow/`); al final se eliminarán **solo** los recursos
+   `*-p12b*`. El proyecto `bjj-tournament-platform` no se toca y nunca se usa `down -v`.
+6. Resultados: usuario de PRUEBA creado y usado para el login (nunca credenciales
+   productivas); producción intacta en todo momento (mismos IDs, `StartedAt` y `restarts=0`).
 
 ---
 
 ## 10. Checklist funcional (candidata vs. actual, antes de desplegar)
 
-Baseline `127.0.0.1:8400`; candidata `127.0.0.1:18400`.
+Baseline `127.0.0.1:8400`; candidata `127.0.0.1:18400`. **Ejecutado el 2026-10-01** contra la
+pila sombra (sección 9); producción solo se consultó (lecturas), nunca se modificó.
 
 | # | Comprobación | Criterio |
 |---|---|---|
@@ -294,7 +337,7 @@ Baseline `127.0.0.1:8400`; candidata `127.0.0.1:18400`.
 | 9 | Assets | `/assets/*.js|css` 200; `grep -rl "http://localhost:8400/api" /app/frontend-dist` **vacío** |
 | 10 | Healthcheck | `healthy` en ~60 s, `FailingStreak=0` |
 | 11 | Usuario | `docker inspect --format '{{.Config.User}}'` = `bracket`; `id -u` ≠ 0 |
-| 12 | Permisos | sin modos 777: `find /app -perm -0002` vacío; `/app/.cache/uv` de `bracket` |
+| 12 | Permisos | sin modos 777: `find /app -perm -0002` vacío (0 entradas reales, en imagen y en runtime); caché uv `/tmp/uv-cache` `0700` de `bracket:bracket`; `.venv/.lock` `0640` |
 | 13 | Logs | sin tracebacks ni 500; 1 worker, bind `0.0.0.0:8400` |
 | 14 | Recursos | RSS del mismo orden que el actual (±20 %) |
 | 15 | nginx | nginx de prueba → candidata: `/` 200 y `/api/ping` 200; tras desplegar, con el nginx productivo (`Host: bjj.local`) |
@@ -302,6 +345,22 @@ Baseline `127.0.0.1:8400`; candidata `127.0.0.1:18400`.
 | 17 | Rollback | probado en la pila de prueba (ver sección 11) |
 
 Diferencias en 1–9 son bloqueantes.
+
+Resultado de la ejecución (candidata r3 vs producción; checks 1–14 ejecutados sin diferencias
+bloqueantes; 15–17 pendientes del despliegue):
+
+| # | Resultado |
+|---|---|
+| 1–3 | `/` 200 (SPA), `/api/ping` 200 `"ping"`, `/openapi.json` 200 (80.672 B) — iguales a producción |
+| 4 | login con el usuario **de prueba** de la sombra OK; 401 con credenciales inválidas |
+| 5–7 | torneos 1, jugadores 16, equipos 8, stages 2 / stage_items 3 / rounds 8 / matches 15 == BD sombra == BD producción |
+| 8 | alembic `c1ab44651e79` en sombra y producción; `--schema-only` idéntico antes/después (15 tablas) |
+| 9 | assets 200 (bundle 1.156.506 B); `grep` de `http://localhost:8400/api` en el bundle servido: **0** |
+| 10 | healthcheck `healthy` |
+| 11–12 | `User=bracket`, `id -u` = 100; **0 entradas reales world-writable** bajo `/app` en imagen y en runtime; `/app/.venv/.lock` `0640`; caché uv en `/tmp/uv-cache` (`0700`) |
+| 13–14 | logs sin tracebacks ni 500; RSS 125,3 MiB (candidata) vs 180,2 MiB (producción) |
+| 15–16 | **no probados** (requieren el nginx productivo / túnel WireGuard; se harán tras el despliegue) |
+| 17 | rollback: pendiente de probar en el despliegue |
 
 ---
 
@@ -323,10 +382,10 @@ Diferencias en 1–9 son bloqueantes.
 | Riesgo | Mitigación |
 |---|---|
 | `auto_run_migrations=True` al arrancar (mecanismo idéntico al de la imagen actual) | Sandbox con copia y `AUTO_RUN_MIGRATIONS=false`; backup `pre-*` antes de desplegar; valorar fijarlo a `false` en producción (cambio aparte) |
-| Bumps de dependencias (starlette 1.0.0, fastapi 0.135; i18next 26, @mantine/form 9, @hcaptcha 2, @vitejs/plugin-react 6) | Es el delta real y va ejercitado por el CI upstream; validación funcional 3–7 en sandbox; contingencia `r2` desde `1522734d` |
-| `pnpm 9.15.9` frente a un lockfile mantenido por pnpm 10 en el upstream | Doble comprobación SHA256 del lockfile en el build; si fallara, se sube el pin (cambio de receta → `r2`) |
+| Bumps de dependencias (starlette 1.0.0, fastapi 0.135; i18next 26, @mantine/form 9, @hcaptcha 2, @vitejs/plugin-react 6) | Es el delta real y va ejercitado por el CI upstream; validación funcional 3–7 en sandbox (superada); contingencia `e6abd7d-c1` desde `1522734d` |
+| `pnpm 9.15.9` frente a un lockfile mantenido por pnpm 10 en el upstream | Doble comprobación SHA256 del lockfile en el build; si fallara, se sube el pin (cambio de receta → nueva revisión `r4`) |
 | node 25 (upstream) vs node 24 (nosotros) | 24 coincide con `.nvmrc` v24.3.0 y mantiene corepack; sin impacto funcional esperado |
-| Permisos no root: `uv run` o el SPA pueden necesitar escribir en `HOME`/caché | `HOME=/app` y `UV_CACHE_DIR=/app/.cache/uv` de `bracket` con 750; checks 11–12 |
+| Permisos no root: `uv run` o el SPA pueden necesitar escribir en `HOME`/caché | `HOME=/app`; caché de uv en `/tmp/uv-cache` (`0700`, `bracket:bracket`), fuera de `/app`; `uv` crea ahí su `.lock`; checks 11–12 |
 | Caches de compilación | `--mount=type=cache` (no entran en la imagen); ninguna ruta con 777 |
 | Publicación arm64-only | Documentado; el único consumidor es arm64 |
 | Deriva entre nuestra receta y el upstream | La doble verificación de hashes hace **fallar el build** si el submódulo cambia sin revisar la receta |
@@ -336,13 +395,42 @@ Diferencias en 1–9 son bloqueantes.
 
 ## 13. Próximos pasos (cada uno con autorización y parada)
 
-1. **Build local** (sin publicar): `docker build -f docker/bracket-bjj/Dockerfile -t danyseve1/bracket-bjj:e6abd7d-r1 .`
-   (requiere red para npm registry y PyPI/uv; el builder arm64 es nativo).
-2. Inspección de la imagen construida: `User`, `HEALTHCHECK`, `docker history`, etiquetas y
-   verificación del bundle dentro de la imagen.
-3. Publicación en Docker Hub + registro del digest.
-4. Sandbox con PostgreSQL restaurado + checklist funcional (sección 10).
-5. Cambio del Compose (una línea + retirada de `VITE_API_BASE_URL`) con backup `pre-*` y
-   rollback listo.
+1. ~~Build local (sin publicar)~~ **hecho**: `r1` → `4c19b86e2c46`, `r2` → `cb314de72c47`,
+   `r3` → `09b19930bde2` (esta última es la candidata).
+2. ~~Inspección de la imagen~~ **hecho** (Usuario, healthcheck, CMD, etiquetas, permisos,
+   bundle y guardia de world-writables).
+3. ~~Sandbox con PostgreSQL restaurado + checklist funcional~~ **hecho** (secciones 9–10).
+4. **Publicación en Docker Hub** de `danyseve1/bracket-bjj:e6abd7d-r3` + registro del digest
+   (sección 14).
+5. Cambio del Compose **por digest** con backup `pre-*` y rollback listo; recrear **solo**
+   `bracket`; validar la cadena nginx → bracket → PostgreSQL.
 6. Merge de la rama a `develop` por fast-forward y actualización de
-   `docs/06-imagen-custom-bracket.md` con el digest publicado.
+   `docs/06-imagen-custom-bracket.md`.
+
+---
+
+## 14. Publicación y despliegue
+
+**Estado**: pendiente de publicación (la imagen validada existe solo en el host).
+
+Registro: `danyseve1/bracket-bjj` (Docker Hub, cuenta `danyseve1`; credenciales ya
+configuradas en el host, nunca en el repo).
+
+```bash
+docker push danyseve1/bracket-bjj:e6abd7d-r3
+# -> digest del manifest (se anota abajo)
+```
+
+| Campo | Valor |
+|---|---|
+| Tag publicado | `danyseve1/bracket-bjj:e6abd7d-r3` — *pendiente del push* |
+| RepoDigest | *pendiente del push* |
+| Fecha UTC de publicación | *pendiente del push* |
+| Arquitectura | `linux/arm64` |
+| Image ID local | `sha256:09b19930bde296aeb2d84851d67d91c61153599f166c92dfb68577c623e712df` |
+| Commit de la receta | `4107d4a1289615c0c268a73e095240c86d230936` (rama `chore/bracket-image-reproducible`) |
+| Upstream (submódulo) | `e6abd7d282850f9d13d9122494767d4dbcb139ef` |
+| Recipe revision | `r3` |
+
+Regla: no se publica `latest`; el tag `e6abd7d-r3` es el que se validó y, una vez conocido el
+digest, el Compose deberá fijar `@sha256:<digest>` (no el tag móvil).
