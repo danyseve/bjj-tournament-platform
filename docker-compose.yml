@@ -61,6 +61,7 @@ services:
     build:
       context: ./bridge-api
     container_name: bjj-bridge-api
+    profiles: ["multitatami"]
     depends_on:
       - bracket
     ports:
@@ -81,6 +82,7 @@ services:
     build:
       context: ./services/scoreboard
     container_name: scoreboard-tatami-1
+    profiles: ["multitatami"]
     ports:
       - "${SCOREBOARD_TATAMI_1_PORT:-3001}:3000"
     networks:
@@ -91,6 +93,7 @@ services:
     build:
       context: ./services/scoreboard
     container_name: scoreboard-tatami-2
+    profiles: ["multitatami"]
     ports:
       - "${SCOREBOARD_TATAMI_2_PORT:-3002}:3000"
     networks:
@@ -101,6 +104,7 @@ services:
     build:
       context: ./services/scoreboard
     container_name: scoreboard-tatami-3
+    profiles: ["multitatami"]
     ports:
       - "${SCOREBOARD_TATAMI_3_PORT:-3003}:3000"
     networks:
@@ -111,6 +115,7 @@ services:
     build:
       context: ./services/scoreboard
     container_name: scoreboard-tatami-4
+    profiles: ["multitatami"]
     ports:
       - "${SCOREBOARD_TATAMI_4_PORT:-3004}:3000"
     networks:
@@ -121,6 +126,7 @@ services:
     build:
       context: ./services/scoreboard
     container_name: scoreboard-tatami-5
+    profiles: ["multitatami"]
     ports:
       - "${SCOREBOARD_TATAMI_5_PORT:-3005}:3000"
     networks:
@@ -131,6 +137,7 @@ services:
     build:
       context: ./services/scoreboard
     container_name: scoreboard-tatami-6
+    profiles: ["multitatami"]
     ports:
       - "${SCOREBOARD_TATAMI_6_PORT:-3006}:3000"
     networks:
