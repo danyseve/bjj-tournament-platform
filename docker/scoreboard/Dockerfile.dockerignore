@@ -1,0 +1,24 @@
+# Dockerfile-specific filter; context remains the repository root.
+# A plain docker/scoreboard/.dockerignore would not apply to context ".".
+**
+!services/
+!services/scoreboard/
+!services/scoreboard/package.json
+!services/scoreboard/package-lock.json
+!services/scoreboard/app.js
+!services/scoreboard/routes/
+!services/scoreboard/routes/**
+!services/scoreboard/views/
+!services/scoreboard/views/**
+!services/scoreboard/public/
+!services/scoreboard/public/**
+**/.git
+**/.git/**
+**/.env
+**/.env.*
+**/node_modules
+**/node_modules/**
+**/backups
+**/backups/**
+**/*.key
+**/*.pem
