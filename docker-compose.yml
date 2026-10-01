@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   bracket:
-    image: danyseve1/bracket-bjj:0.1.0
+    image: danyseve1/bracket-bjj@sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8
     container_name: bracket
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
@@ -56,6 +56,7 @@ services:
       SERVE_FRONTEND: "true"
       API_PREFIX: "/api"
       VITE_API_BASE_URL: "/api"
+      AUTO_RUN_MIGRATIONS: "false"
 #    networks:
 #      - bjj-net
     networks:
