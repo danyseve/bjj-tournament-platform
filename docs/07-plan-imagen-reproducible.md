@@ -1,6 +1,7 @@
 # 07 — Plan de imagen Bracket reproducible (P1.2b)
 
-Estado: **receta construida y validada (release candidate `r3`); pendiente de desplegar**.
+Estado: **receta construida, validada y publicada (release candidate `r3`, digest
+`sha256:e07ec8b4…8df8`); pendiente de desplegar**.
 Este documento acompaña a `docker/bracket-bjj/Dockerfile` (receta propia, revision `r3`) y a
 `docker/bracket-bjj/Dockerfile.dockerignore`. Producción sigue intacta: la imagen validada
 **no** se ha desplegado (ver sección 14).
@@ -411,7 +412,8 @@ bloqueantes; 15–17 pendientes del despliegue):
 
 ## 14. Publicación y despliegue
 
-**Estado**: pendiente de publicación (la imagen validada existe solo en el host).
+**Estado**: **publicada** (Docker Hub, 2026-10-01 18:35–18:36 UTC). El despliegue en
+producción sigue **pendiente**.
 
 Registro: `danyseve1/bracket-bjj` (Docker Hub, cuenta `danyseve1`; credenciales ya
 configuradas en el host, nunca en el repo).
@@ -423,14 +425,26 @@ docker push danyseve1/bracket-bjj:e6abd7d-r3
 
 | Campo | Valor |
 |---|---|
-| Tag publicado | `danyseve1/bracket-bjj:e6abd7d-r3` — *pendiente del push* |
-| RepoDigest | *pendiente del push* |
-| Fecha UTC de publicación | *pendiente del push* |
-| Arquitectura | `linux/arm64` |
-| Image ID local | `sha256:09b19930bde296aeb2d84851d67d91c61153599f166c92dfb68577c623e712df` |
-| Commit de la receta | `4107d4a1289615c0c268a73e095240c86d230936` (rama `chore/bracket-image-reproducible`) |
+| Tag publicado | `danyseve1/bracket-bjj:e6abd7d-r3` |
+| RepoDigest | `danyseve1/bracket-bjj@sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8` |
+| Fecha UTC de publicación | 2026-10-01T18:35:38Z → 18:36:00Z (`docker push` exit 0) |
+| Arquitectura | `linux/arm64` (variant v8), manifest *single-platform* `application/vnd.docker.distribution.manifest.v2+json`, 16 capas, 3662 B de manifest, 331 MB |
+| Image ID local | `sha256:09b19930bde296aeb2d84851d67d91c61153599f166c92dfb68577c623e712df` (= digest del *config* del manifest remoto: verificación de que lo publicado es exactamente lo validado) |
+| Commit de la receta | `4107d4a1289615c0c268a73e095240c86d230936` (rama `chore/bracket-image-reproducible`); el presente documento se actualiza en `b902049cdda54152819f4509dbe8a5730f7ed591` y en el commit que añade este digest |
 | Upstream (submódulo) | `e6abd7d282850f9d13d9122494767d4dbcb139ef` |
 | Recipe revision | `r3` |
 
-Regla: no se publica `latest`; el tag `e6abd7d-r3` es el que se validó y, una vez conocido el
-digest, el Compose deberá fijar `@sha256:<digest>` (no el tag móvil).
+Verificación del digest por tres vías coincidentes:
+1. salida de `docker push`: `e6abd7d-r3: digest: sha256:e07ec8b4…8df8 size: 3662`;
+2. `docker image inspect … --format '{{json .RepoDigests}}'` →
+   `["danyseve1/bracket-bjj@sha256:e07ec8b4…8df8"]`;
+3. `docker buildx imagetools inspect` y `docker manifest inspect -v` (remoto) → mismo digest,
+   `platform: linux/arm64/v8`, `config.digest = sha256:09b19930bde2…` (el Image ID local).
+
+El tag `latest` del repositorio **no** lo hemos tocado: sigue apuntando a
+`sha256:38569b93ab2ab72af4b3cb98b8b49d1509facdedda6cfabf70bf1b712fed6bfc` (imagen legacy,
+pre-existente). No se han publicado `r1`, `r2` ni `0.1.0`.
+
+Regla: el tag `e6abd7d-r3` es el que se validó; el Compose deberá fijar
+`danyseve1/bracket-bjj@sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8`
+(no el tag móvil).
