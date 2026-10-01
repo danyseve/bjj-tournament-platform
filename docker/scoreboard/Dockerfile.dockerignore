@@ -12,6 +12,10 @@
 !services/scoreboard/views/**
 !services/scoreboard/public/
 !services/scoreboard/public/**
+!scoreboard-adapter/
+!scoreboard-adapter/launcher.js
+!scoreboard-adapter/integrated.js
+!scoreboard-adapter/state.js
 **/.git
 **/.git/**
 **/.env
