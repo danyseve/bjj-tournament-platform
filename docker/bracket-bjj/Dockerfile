@@ -27,8 +27,11 @@
 FROM node:24-alpine@sha256:38a36422dc7de80f3ced964270f23b3b17f73af816728d21a5fbbf84bf8be46f AS frontend
 
 WORKDIR /app
-ENV NODE_ENV=production \
-    CI=true
+# NODE_ENV=production NO se define aqui a proposito: pnpm 9.x omite las
+# devDependencies cuando NODE_ENV=production, y `vite` (que ejecuta el script
+# `build`) es una devDependency -> el primer build fallo con `sh: vite: not found`.
+# Se activa mas abajo, despues de `pnpm install`, antes de `pnpm build`.
+ENV CI=true
 
 # pnpm fijado de forma explicita: el proyecto NO declara `packageManager`.
 # Version elegida: 9.15.9 (ultima de la rama 9.x), que es la rama que escribe y
@@ -51,6 +54,10 @@ RUN echo "${PNPM_LOCK_SHA256}  pnpm-lock.yaml" | sha256sum -c -
 RUN --mount=type=cache,id=bracket-pnpm-store,target=/pnpm-store \
     pnpm config set store-dir /pnpm-store \
  && pnpm install --frozen-lockfile
+
+# Modo production activado DESPUES de instalar: asi pnpm ha instalado tambien
+# las devDependencies y `pnpm build` (vite) puede ejecutarse en modo production.
+ENV NODE_ENV=production
 
 RUN echo "${PNPM_LOCK_SHA256}  pnpm-lock.yaml" | sha256sum -c - \
  && echo "OK: pnpm no ha reescrito el lockfile"
