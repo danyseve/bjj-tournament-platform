@@ -1,6 +1,6 @@
 services:
   bracket-postgres:
-    image: postgres:16
+    image: postgres@sha256:bffa6baeb307a531d731bf3ef9835dc396afaeddf81944337b8f990b2109ffca
     container_name: bracket-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bracket_dev}
