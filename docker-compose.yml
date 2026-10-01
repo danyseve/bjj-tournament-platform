@@ -37,6 +37,12 @@ services:
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
 #    container_name: bracket
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://127.0.0.1:8400/api/ping | grep -q "\"ping\""']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       - bracket-postgres
     ports:
