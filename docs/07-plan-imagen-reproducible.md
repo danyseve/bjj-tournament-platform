@@ -401,19 +401,21 @@ bloqueantes; 15–17 pendientes del despliegue):
 2. ~~Inspección de la imagen~~ **hecho** (Usuario, healthcheck, CMD, etiquetas, permisos,
    bundle y guardia de world-writables).
 3. ~~Sandbox con PostgreSQL restaurado + checklist funcional~~ **hecho** (secciones 9–10).
-4. **Publicación en Docker Hub** de `danyseve1/bracket-bjj:e6abd7d-r3` + registro del digest
-   (sección 14).
-5. Cambio del Compose **por digest** con backup `pre-*` y rollback listo; recrear **solo**
-   `bracket`; validar la cadena nginx → bracket → PostgreSQL.
-6. Merge de la rama a `develop` por fast-forward y actualización de
-   `docs/06-imagen-custom-bracket.md`.
+4. ~~Publicación en Docker Hub~~ **hecho**: `danyseve1/bracket-bjj:e6abd7d-r3` + digest
+   registrado (sección 14).
+5. ~~Cambio del Compose **por digest** con backup `pre-*` y rollback listo~~ **hecho**
+   (2026-10-01T18:43:47Z; recreado **solo** `bracket`; cadena nginx → bracket → PostgreSQL validada).
+6. ~~Merge de la rama a `develop` por fast-forward y actualización de
+   `docs/06-imagen-custom-bracket.md`~~ **hecho** (`develop` = `ebd1215`).
+
+Estado final y retirada del sandbox: sección 15.
 
 ---
 
 ## 14. Publicación y despliegue
 
-**Estado**: **publicada** (Docker Hub, 2026-10-01 18:35–18:36 UTC). El despliegue en
-producción sigue **pendiente**.
+**Estado** (histórico de esta sección): **publicada** en Docker Hub el 2026-10-01 18:35–18:36 UTC.
+El despliegue en producción y el cierre de P1.2 se registran en la sección 15.
 
 Registro: `danyseve1/bracket-bjj` (Docker Hub, cuenta `danyseve1`; credenciales ya
 configuradas en el host, nunca en el repo).
@@ -448,3 +450,32 @@ pre-existente). No se han publicado `r1`, `r2` ni `0.1.0`.
 Regla: el tag `e6abd7d-r3` es el que se validó; el Compose deberá fijar
 `danyseve1/bracket-bjj@sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8`
 (no el tag móvil).
+
+---
+
+## 15. Cierre de P1.2 (estado final)
+
+**P1.2 — CLOSED** (2026-10-01). La sección 8 (Compose por digest) quedó **aplicada** y la sección 13
+quedó **completada**.
+
+- **Imagen validada**: `danyseve1/bracket-bjj:e6abd7d-r3`, digest
+  `sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8`
+  (Image ID local `sha256:09b19930bde2…`, upstream `e6abd7d…`, recipe revision `r3`).
+- **Despliegue en producción** el **2026-10-01T18:43:47Z → 18:43:48Z UTC**, fijando el **digest** en
+  `docker-compose.yml` y recreando **solo** el servicio `bracket` (PostgreSQL, nginx y WireGuard
+  intactos). Cadena `nginx → bracket → PostgreSQL` validada.
+- **Merge a `develop`** por *fast-forward*: `develop` = `origin/develop` = `ebd1215`.
+- **Pila sombra retirada correctamente** el **2026-10-01T19:00:36Z → 19:01:01Z UTC**:
+  parados y eliminados `bracket-p12b` y `bracket-p12b-postgres`, red `bjj-p12b-test`,
+  volumen `bjj-p12b-pgdata`, las credenciales efímeras (`pg.env`, `app.env`, `test-user.env`) y el
+  directorio `/home/ubuntu/p12b-shadow/`. No se tocó nada más: en particular se conservan el volumen
+  productivo `bjj-tournament-platform_bracket_postgres_data` y sus datos.
+- **Producción continuó estable**: sin incidencias desde el despliegue, mismos contenedores, `healthy`,
+  `restarts=0`.
+- **Evidencia conservada** (no sensible) en
+  **`/home/ubuntu/backups/bjj-tournament-platform/p12b-evidence/`** con `SHA256SUMS`: logs de la
+  candidata y del PostgreSQL del sandbox, prueba A/B de `BASE_URL`, volcados de esquema (solo DDL, sin
+  datos), `schema-drift-check.txt` (deriva 0) y el resumen `P12B-SHADOW-VALIDATION.md`.
+- Se conservan las imágenes `e6abd7d-r1`, `e6abd7d-r2` y la legacy `0.1.0`/`latest` para rollback y
+  comparación; los backups PostgreSQL `pre-*` quedan intactos.
+
