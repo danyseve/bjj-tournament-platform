@@ -55,7 +55,6 @@ services:
       CORS_ORIGINS: "http://10.0.0.67:8400,http://10.0.0.67:8080,http://localhost:8400,http://bjj.local:8080,http://bjj.test:8080"
       SERVE_FRONTEND: "true"
       API_PREFIX: "/api"
-      VITE_API_BASE_URL: "/api"
       AUTO_RUN_MIGRATIONS: "false"
 #    networks:
 #      - bjj-net
