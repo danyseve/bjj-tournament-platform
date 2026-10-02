@@ -603,3 +603,153 @@ test('55 clear_match exige credencial de control y no se puede disparar desde la
  assert.equal((await (await fetch(url + '/internal/tatamis/1/state', {headers: {'x-internal-token': INTERNAL}})).json()).state.status, 'finished');
  await controller.close(); await display.close();
 });
+
+// cancel_assignment: la valvula de seguridad de una asignacion equivocada. Solo
+// libera un combate intacto (ready, reloj completo, marcador a cero, sin
+// resultado), asi que nunca abandona un combate vivo ni sirve para reabrir uno
+// cerrado. No llama a Bracket: el guard 26 cubre este camino igual que el resto.
+const cancel = (s, extra = {}) => s.apply({...base(s.snapshot()), operation: 'cancel_assignment', ...extra});
+
+test('56 cancel_assignment libera una asignacion ready intacta y sube revision una vez', () => {
+ const s = assigned(), before = s.snapshot(), r = cancel(s);
+ assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.changed, true);
+ assert.equal(r.revision, before.revision + 1); assert.equal(r.state, null);
+});
+
+test('57 tras cancelar el tatami queda vacio: sin estado, sin sesion, sin reloj y sin historial', () => {
+ const s = assigned(), session = s.snapshot().session_id;
+ assert.equal(cancel(s).ok, true);
+ assert.equal(s.snapshot(), null, 'ningun combate activo');
+ assert.equal(s.running(), false, 'el reloj no corre');
+ const document = s.document();
+ assert.equal(document.state, null); assert.deepEqual(document.command_history, []);
+ assert.equal(document.clock.wall_anchor, null);
+ const stale = s.apply({session_id: session, command_id: 'synthetic-stale-command', expected_revision: 1,
+  tatami_id: 1, match_id: 40, operation: 'reset'});
+ assert.equal(stale.ok, false); assert.equal(stale.code, 'wrong_session');
+ assert.equal(s.snapshot(), null, 'una sesion cancelada no puede resucitar el combate');
+});
+
+test('58 un combate en marcha o en pausa no se puede cancelar', () => {
+ for (const phase of ['running', 'paused']) {
+  const s = assigned();
+  running(s, true); if (phase === 'paused') running(s, false);
+  const before = s.snapshot();
+  assert.equal(before.status, phase);
+  const r = cancel(s);
+  assert.equal(r.ok, false, phase); assert.equal(r.code, 'not_ready', phase);
+  assert.deepEqual(s.snapshot(), before, phase + ': el rechazo no muta el combate');
+ }
+});
+
+test('59 un combate pendiente de resultado no se puede cancelar', () => {
+ const s = assigned();
+ running(s, true); clock.value += 300000;
+ assert.equal(s.snapshot().status, 'awaiting_result');
+ const before = s.snapshot(), r = cancel(s);
+ assert.equal(r.ok, false); assert.equal(r.code, 'not_ready');
+ assert.deepEqual(s.snapshot(), before, 'el pendiente de resultado se queda pendiente');
+});
+
+test('60 un combate finalizado no se puede cancelar ni reabrir con cancel_assignment', () => {
+ const s = assigned(), state = finalState(s, 101, 'points');
+ assert.equal(state.status, 'finished');
+ const before = s.snapshot(), r = cancel(s);
+ assert.equal(r.ok, false); assert.equal(r.code, 'not_ready');
+ assert.deepEqual(s.snapshot(), before, 'el resultado sigue congelado');
+ assert.equal(s.snapshot().winner_team_id, 101);
+});
+
+test('61 un combate ready con marcador no se puede cancelar', () => {
+ for (const [fighter, field, delta] of [['a', 'points', 2], ['b', 'advantages', 1], ['a', 'penalties', 1]]) {
+  const s = assigned();
+  assert.equal(score(s, fighter, field, delta).ok, true, field);
+  const before = s.snapshot(), r = cancel(s);
+  assert.equal(r.ok, false, field); assert.equal(r.code, 'not_clean', field);
+  assert.deepEqual(s.snapshot(), before, field + ': el rechazo no muta el marcador');
+ }
+});
+
+test('62 un estado ready incoherente nunca llega a existir y el combate intacto no se toca', () => {
+ const s = assigned(), document = s.document(), {InvalidStateError} = require('../state');
+ const partialClock = structuredClone(document);
+ partialClock.state.remaining_seconds = 120;
+ assert.throws(() => s.restore(partialClock), InvalidStateError, 'la recuperacion ya rechaza un ready con el reloj consumido');
+ const withResult = structuredClone(document);
+ withResult.state.winner_team_id = 101; withResult.state.method = 'points';
+ assert.throws(() => s.restore(withResult), InvalidStateError, 'la recuperacion ya rechaza un resultado en fase ready');
+ const before = s.snapshot();
+ assert.equal(before.status, 'ready');
+ assert.equal(cancel(s).ok, true, 'el combate intacto sigue siendo cancelable');
+});
+
+test('63 el mismo command_id repetido devuelve el mismo ack y no vuelve a mutar', () => {
+ const s = assigned(), command = {...base(s.snapshot()), operation: 'cancel_assignment'};
+ const first = s.apply(command);
+ assert.equal(first.ok, true); assert.equal(first.revision, 2);
+ assert.deepEqual(s.apply({...command}), first, 'el reintento responde exactamente el mismo ack');
+ assert.equal(s.snapshot(), null); assert.deepEqual(s.document().command_history, []);
+ const fresh = s.apply({...command, command_id: 'synthetic-command-fresh'});
+ assert.equal(fresh.ok, false); assert.equal(fresh.code, 'wrong_session', 'sin sesion que cancelar no hay otra cancelacion');
+ assert.equal(s.snapshot(), null);
+ assert.equal(s.assign(fixture()).status, 201, 'la memoria del reintento no bloquea un combate nuevo');
+ assert.equal(s.snapshot().status, 'ready');
+ const late = s.apply({...command});
+ assert.equal(late.ok, false); assert.equal(late.code, 'wrong_session', 'un ack viejo no habla por la sesion nueva');
+ assert.deepEqual(s.snapshot().status, 'ready');
+});
+
+test('64 cancel_assignment exige la forma exacta, la sesion y el combate correctos', () => {
+ const s = assigned(), before = s.snapshot();
+ const cases = [
+  [{...base(before), operation: 'cancel_assignment', extra: 1}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', command_id: ''}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', expected_revision: -1}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', expected_revision: 1.5}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', tatami_id: 2}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', winner_team_id: 101}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', method: 'points'}, 'invalid_command'],
+  [{...base(before), operation: 'cancel_assignment', session_id: 'synthetic-session-other'}, 'wrong_session'],
+  [{...base(before), operation: 'cancel_assignment', match_id: before.match_id + 1}, 'wrong_match'],
+ ];
+ for (const [command, code] of cases) {
+  const r = s.apply(command);
+  assert.equal(r.ok, false, JSON.stringify(command)); assert.equal(r.code, code, JSON.stringify(command));
+ }
+ assert.deepEqual(s.snapshot(), before, 'ningun rechazo muta el combate');
+});
+
+test('65 tras cancelar, una asignacion nueva obtiene otra sesion y revision 1', () => {
+ const s = assigned(), session = s.snapshot().session_id;
+ assert.equal(cancel(s).ok, true);
+ const created = s.assign(fixture());
+ assert.equal(created.status, 201);
+ assert.equal(created.state.revision, 1);
+ assert.notEqual(created.state.session_id, session);
+ assert.equal(created.state.status, 'ready');
+ assert.deepEqual([created.state.fighter_a.points, created.state.fighter_b.points], [0, 0]);
+});
+
+test('66 cancel_assignment por socket exige credencial de control y vacia el tatami para todos', async t => {
+ const {url} = await server(t), state = await assign(url);
+ const controller = await connect(url, cookie(CONTROL)), display = await connect(url);
+ await controller.poll(); await display.poll();
+ const cancelCommand = {...base(state), operation: 'cancel_assignment'};
+ await display.send('tatami:update', {...cancelCommand}, 1);
+ assert.deepEqual(acks(await display.poll()).get(1), {ok: false, code: 'unauthorized', revision: 1});
+ const untouched = await (await fetch(url + '/internal/tatamis/1/state', {headers: {'x-internal-token': INTERNAL}})).json();
+ assert.equal(untouched.state.status, 'ready', 'la pantalla de solo lectura no cancela nada');
+ await controller.send('tatami:update', cancelCommand, 2);
+ assert.deepEqual(acks(await controller.poll()).get(2), {ok: true, command_id: cancelCommand.command_id, revision: 2});
+ const broadcast = events(await display.poll()).filter(([event]) => event === 'tatami:state');
+ assert.deepEqual(broadcast.at(-1), ['tatami:state', null], 'el tatami vacio se emite de forma explicita');
+ const released = await (await fetch(url + '/internal/tatamis/1/state', {headers: {'x-internal-token': INTERNAL}})).json();
+ assert.equal(released.state, null);
+ // La operacion no tiene ruta HTTP propia: solo viaja por socket autenticado.
+ for (const route of ['/internal/tatamis/1/cancel', '/internal/tatamis/1/cancel_assignment']) {
+  assert.equal((await fetch(url + route, {method: 'POST', headers: {'x-internal-token': INTERNAL}})).status, 404, route);
+ }
+ const next = await assign(url, otherFixture());
+ assert.equal(next.status, 'ready'); assert.notEqual(next.session_id, state.session_id);
+ await controller.close(); await display.close();
+});

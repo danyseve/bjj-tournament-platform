@@ -456,3 +456,73 @@ test('UI24 la pantalla / anuncia el tiempo agotado sin inventar ganador y nunca 
  }
  assert.deepEqual(p.emits,[],'solo lectura');
 });
+
+test('UI25 el panel de cancelacion solo existe en las paginas de control y solo con un combate intacto',async t=>{
+ const {url}=await running(t),display=await page(url,'/');
+ assert.equal(display.doc.querySelector('#integrated-cancel'),null,'/ no construye el panel de cancelacion');
+ for(const route of ['/control','/control2']) {
+  const p=await page(url,route);
+  assert.ok(p.doc.querySelector('#integrated-cancel'),route+' construye el panel');
+  assert.equal(p.doc.querySelector('#cancel-open').disabled,true,route+' sin sesion no se puede cancelar');
+  assert.equal(p.doc.querySelector('#integrated-cancel').style.display,'none',route+' sin combate esta oculto');
+  p.handlers['tatami:state'](sides());
+  assert.equal(p.doc.querySelector('#cancel-open').disabled,false,route+' ready intacto se puede cancelar');
+  assert.notEqual(p.doc.querySelector('#integrated-cancel').style.display,'none',route+' con combate intacto se ofrece');
+  p.handlers['tatami:state'](sides({points:2}));
+  assert.equal(p.doc.querySelector('#integrated-cancel').style.display,'none',route+' con puntos no se ofrece');
+  p.handlers['tatami:state']({...sides({advantages:1},{penalties:2}),revision:3});
+  assert.equal(p.doc.querySelector('#integrated-cancel').style.display,'none',route+' con ventajas y penalizaciones no se ofrece');
+  p.handlers['tatami:state']({...sides(),status:'running',remaining_seconds:200,revision:4});
+  assert.equal(p.doc.querySelector('#integrated-cancel').style.display,'none',route+' en marcha no se ofrece');
+  p.handlers['tatami:state']({...sides({points:4},{points:2}),status:'finished',revision:5,remaining_seconds:0,winner_team_id:101,method:'points'});
+  assert.equal(p.doc.querySelector('#integrated-cancel').style.display,'none',route+' finalizado no se ofrece');
+  p.emits.length=0;
+  for(const id of ['cancel-open','cancel-confirm','cancel-abort']) {
+   const n=p.doc.querySelector('#'+id);if(n!==null)n.dispatchEvent(new p.w.Event('click',{bubbles:true}));
+  }
+  assert.deepEqual(p.emits,[],route+' sin combate intacto no se emite nada');
+ }
+});
+
+test('UI26 cancelar exige confirmacion explicita y emite un unico cancel_assignment',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state'](sides());
+ assert.equal(p.doc.querySelector('#cancel-open').disabled,false);
+ p.emits.length=0;
+ click(p,'cancel-open');
+ assert.deepEqual(p.emits,[],'el primer acto no emite');
+ assert.equal(p.doc.querySelector('#cancel-confirm').style.display,'');
+ assert.equal(p.doc.querySelector('#clear-confirm').style.display,'none','cancelar no arma la liberacion');
+ assert.equal(p.doc.querySelector('#finish-confirm').style.display,'none','cancelar no arma la finalizacion');
+ assert.match(p.doc.querySelector('#cancel-ask').textContent,/Cancelar la asignación/);
+ click(p,'cancel-abort');
+ assert.deepEqual(p.emits,[]);
+ assert.equal(p.doc.querySelector('#cancel-confirm').style.display,'none');
+ click(p,'cancel-open');click(p,'cancel-confirm');
+ assert.equal(p.emits.length,1);
+ assert.equal(p.emits[0][0],'tatami:update');
+ assert.equal(p.emits[0][1].operation,'cancel_assignment');
+ assert.deepEqual(Object.keys(p.emits[0][1]).sort(),['command_id','expected_revision','match_id','operation','session_id','tatami_id']);
+ assert.equal(p.emits[0][1].session_id,'synthetic-session-a');
+ assert.equal(p.emits[0][1].expected_revision,1);
+ click(p,'cancel-confirm');
+ assert.equal(p.emits.length,1,'el segundo clic no reemite');
+ p.handlers['tatami:state'](null);
+ assert.match(presentation(p).mode,/Waiting/);
+ assert.equal(p.doc.querySelector('#cancel-open').disabled,true);
+});
+
+test('UI27 armar la cancelacion no sobrevive a un cambio de estado del servidor',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state'](sides());
+ click(p,'cancel-open');
+ assert.equal(p.doc.querySelector('#cancel-confirm').style.display,'');
+ p.handlers['tatami:state']({...sides(),status:'running',remaining_seconds:200,revision:2});
+ assert.equal(p.doc.querySelector('#integrated-cancel').style.display,'none','en marcha se retira');
+ p.emits.length=0;
+ click(p,'cancel-confirm');
+ assert.deepEqual(p.emits,[],'la cancelacion armada no se emite sobre un combate vivo');
+ p.handlers['tatami:state']({...sides(),status:'ready',remaining_seconds:305,revision:3});
+ assert.equal(p.doc.querySelector('#cancel-open').disabled,false,'vuelto a ready intacto se ofrece otra vez');
+ assert.equal(p.doc.querySelector('#cancel-confirm').style.display,'none','y no queda armado de antes');
+});

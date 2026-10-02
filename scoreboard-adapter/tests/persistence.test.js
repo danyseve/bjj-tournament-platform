@@ -512,3 +512,33 @@ test('28/29 — el adapter no tiene cliente HTTP saliente ni nocion de Bracket',
   assert.equal(integrated.includes(forbidden), false, 'integrated.js no debe contener ' + forbidden);
  }
 });
+
+test('30 — cancel_assignment persiste state:null explicito y limpia el historial', t => {
+ const {space, store} = setup({label: 'cancel'});
+ t.after(() => space.cleanup());
+ assert.equal(store.assign(normalized(42, 600)).status, 201);
+ assert.equal(run(store, 'cancel_assignment').ok, true);
+ const stored = space.read();
+ assert.equal(stored.state, null);
+ assert.deepEqual(stored.command_history, []);
+ assert.equal(stored.clock.wall_anchor, null);
+ assert.deepEqual(space.entries(), ['state.json'], 'el fichero se conserva con null explicito, no se borra');
+});
+
+test('31 — recovery tras cancelar: el tatami revive vacio y admite un combate nuevo', t => {
+ const time = clock();
+ const {space, store} = setup({label: 'cancel-recovery', time});
+ t.after(() => space.cleanup());
+ assert.equal(store.assign(normalized(42, 600)).status, 201);
+ const session = store.snapshot().session_id;
+ assert.equal(run(store, 'cancel_assignment').ok, true);
+ const revived = revive(space, time);
+ assert.equal(revived.snapshot, null, 'nada que restaurar: el tatami quedo libre');
+ assert.equal(revived.store.snapshot(), null);
+ assert.equal(revived.store.running(), false);
+ const created = revived.store.assign(normalized(43, 600));
+ assert.equal(created.status, 201, 'un tatami cancelado admite otro combate tras reiniciar');
+ assert.notEqual(created.state.session_id, session);
+ assert.equal(created.state.revision, 1);
+ assert.equal(revived.files.load().state.match_id, 43);
+});

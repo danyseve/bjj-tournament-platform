@@ -43,8 +43,10 @@
  let sequence = 0;
  let armed = false;
  let clearArmed = false;
+ let cancelArmed = false;
  const panel = control === true ? buildFinishPanel() : null;
  const clearPanel = control === true ? buildClearPanel() : null;
+ const cancelPanel = control === true ? buildCancelPanel() : null;
  const result = buildResult();
 
  function node(tag, id, text) {
@@ -86,6 +88,34 @@
   root.append(open, ask, confirm, cancel);
   document.body.appendChild(root);
   return {root, ask, open, confirm, cancel};
+  }
+// A third, separate surface for the mistaken assignment. It is neither the
+// post-finish release nor a side effect of finishing: it only ever appears while
+// the match is still untouched (ready, full clock, no scoring, no result), which
+// is exactly the window in which nothing can be lost by dropping it.
+ function buildCancelPanel() {
+  const root = node('div', 'integrated-cancel');
+  root.style.cssText = 'position:fixed;left:0;bottom:36px;z-index:1000;background:#111;color:#fff;padding:6px 8px;font:14px sans-serif;display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+  const ask = node('span', 'cancel-ask');
+  const open = node('button', 'cancel-open', 'Cancelar asignación');
+  const confirm = node('button', 'cancel-confirm', 'Confirmar cancelación');
+  const abort = node('button', 'cancel-abort', 'Cancelar');
+  root.append(open, ask, confirm, abort);
+  document.body.appendChild(root);
+  return {root, ask, open, confirm, abort};
+ }
+ // The server refuses anything that is not a pristine ready match; the panel
+ // mirrors that same predicate so it is never offered where it would be refused.
+ function cancelable() {
+  if (state === null || state.status !== 'ready') return false;
+  if (state.remaining_seconds !== state.duration_seconds) return false;
+  // A missing result field means the same as an explicit null: the canonical
+  // snapshot always carries both, but offering the action must not depend on
+  // that. The server is the authority and refuses anything that is not pristine.
+  if (state.winner_team_id !== null && state.winner_team_id !== undefined) return false;
+  if (state.method !== null && state.method !== undefined) return false;
+  return [state.fighter_a, state.fighter_b].every(fighter =>
+   fighter.points === 0 && fighter.advantages === 0 && fighter.penalties === 0);
  }
  function buildResult() {
   const banner = node('div', 'integrated-result');
@@ -173,10 +203,24 @@
    element.style.display = clearArmed === true ? '' : 'none';
   }
  }
+ // The cancellation surface is offered only while the match is untouched, and it
+ // is always a two-step action of its own: it is never the release after a finish.
+ function paintCancel() {
+  if (cancelPanel === null) return;
+  const allowed = cancelable();
+  if (allowed === false) cancelArmed = false;
+  cancelPanel.root.style.display = allowed === true ? '' : 'none';
+  cancelPanel.open.disabled = allowed === false || cancelArmed === true;
+  cancelPanel.open.style.display = cancelArmed === true ? 'none' : '';
+  cancelPanel.ask.textContent = cancelArmed === true ? '¿Cancelar la asignación? El combate quedará sin asignar.' : '';
+  for (const element of [cancelPanel.ask, cancelPanel.confirm, cancelPanel.abort]) {
+   element.style.display = cancelArmed === true ? '' : 'none';
+  }
+ }
  function paint() {
   document.querySelectorAll(LOCKABLE).forEach(node => {
-   // The finalization and release controls live outside the legacy lock set.
-   if (node.closest('#integrated-finish') !== null || node.closest('#integrated-clear') !== null) return;
+   // The finalization, release and cancellation controls live outside the legacy lock set.
+   if (node.closest('#integrated-finish') !== null || node.closest('#integrated-clear') !== null || node.closest('#integrated-cancel') !== null) return;
    if (active(node.id) === true) {
     node.disabled = false;
     node.removeAttribute('disabled');
@@ -201,6 +245,7 @@
   }
   paintFinish();
   paintClear();
+  paintCancel();
  }
  function waiting() {
   state = null;
@@ -213,6 +258,7 @@
   document.querySelectorAll('.timer').forEach(node => {node.textContent = '--:--';});
   armed = false;
   clearArmed = false;
+  cancelArmed = false;
   result.textContent = resultText();
   paint();
  }
@@ -310,5 +356,22 @@
    clearArmed = false;
    paintClear();
   });
- }
+  // Cancelling a mistaken assignment is a separate two-step action, offered only
+  // on an untouched ready match: it is never the post-finish release.
+  cancelPanel.open.addEventListener('click', () => {
+   if (cancelable() !== true) return;
+   cancelArmed = true;
+   paintCancel();
+  });
+  cancelPanel.abort.addEventListener('click', () => {
+   cancelArmed = false;
+   paintCancel();
+  });
+  cancelPanel.confirm.addEventListener('click', () => {
+   if (cancelArmed !== true || cancelable() !== true) return;
+   send('cancel_assignment', {});
+   cancelArmed = false;
+   paintCancel();
+  });
+}
 })();

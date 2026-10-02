@@ -13,7 +13,10 @@ const {performance} = require('node:perf_hooks');
 // awaiting_result means the clock ran out while the result is still open (no
 // winner recorded yet); finished means the result is closed and frozen. An
 // explicit clear_match empties the tatami, and only a finished match may be
-// cleared. The state lives in memory and, when the integrated server hands in a
+// cleared. cancel_assignment is the safety valve for a mistaken assignment: it
+// empties the tatami too, but only while the match is still pristine (ready,
+// full clock, no scoring, no result), so it can never abandon an open or closed
+// fight. The state lives in memory and, when the integrated server hands in a
 // persistence sink, is mirrored to a versioned local document after every
 // accepted command (document()/save() below). Recovery (restore()) rebuilds the
 // monotonic clock anchor from wall time exactly once, on startup.
@@ -49,6 +52,7 @@ const OPERATIONS = {
  reset: [...COMMAND_KEYS],
  finish: [...COMMAND_KEYS, 'winner_team_id', 'method'],
  clear_match: [...COMMAND_KEYS],
+ cancel_assignment: [...COMMAND_KEYS],
 };
 function exact(value, keys) {
  return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -155,6 +159,11 @@ function createStore(options = {}) {
  let active = null;
  let assignment = null;
  let commands = new Map();
+ // Ack of the last accepted cancellation, kept in memory only (it is not part of
+ // the persisted contract, which forbids a command history once the tatami is
+ // empty). It answers a retry of that exact command_id after the session is gone;
+ // a restart simply forgets it and there is nothing left to cancel either way.
+ let lastCancel = null;
  // Running clock anchor: the remaining seconds observed at a monotonic instant.
  // null while the clock is stopped, in which case active.remaining_seconds is
  // the frozen truth. remaining_seconds is never decremented tick by tick.
@@ -240,6 +249,11 @@ function createStore(options = {}) {
   if (!identifier(command.session_id) || !identifier(command.command_id)) return refuse('invalid_command');
   if (!Number.isSafeInteger(command.expected_revision) || command.expected_revision < 0) return refuse('invalid_command');
   if (command.tatami_id !== 1 || !positive(command.match_id)) return refuse('invalid_command');
+  // A retry of the cancellation that already emptied the tatami answers with its
+  // own ack and touches nothing: after that session is gone there is no other
+  // memory of it, and there is no mutation left to repeat.
+  if (active === null && lastCancel !== null && lastCancel.operation === command.operation
+   && lastCancel.command_id === command.command_id) return {...lastCancel.ack};
   if (active === null || command.session_id !== active.session_id) return refuse('wrong_session');
   if (command.match_id !== active.match_id) return refuse('wrong_match');
   // Idempotency is checked before the revision: a retry of an accepted command
@@ -270,6 +284,34 @@ function createStore(options = {}) {
     return refuse('persist_failed');
    }
    return {ok: true, command_id: command.command_id, revision, changed: true, state: null};
+  }
+  // cancel_assignment releases an assignment made by mistake, before the fight
+  // ever starts. Only a pristine ready match qualifies: full clock, no scoring,
+  // no result. Everything else is refused, so this is never a way to abandon an
+  // open fight nor a shortcut around finish.
+  if (command.operation === 'cancel_assignment') {
+   if (active.status !== 'ready') return refuse('not_ready');
+   // The clock never started and nothing was recorded: any deviation means the
+   // match is not untouched, and an untouched match is the only safe thing to drop.
+   if (active.remaining_seconds !== active.duration_seconds) return refuse('inconsistent_state');
+   if (active.winner_team_id !== null || active.method !== null) return refuse('inconsistent_state');
+   if (['fighter_a', 'fighter_b'].some(side => FIELDS.some(field => active[side][field] !== 0))) return refuse('not_clean');
+   // The tatami goes empty exactly as it does after a released result: session,
+   // clock and the idempotency memory of that session disappear together.
+   const revision = active.revision + 1;
+   active = null;
+   assignment = null;
+   commands = new Map();
+   anchor = null;
+   try {
+    save();
+   } catch (error) {
+    restoreMemory(before);
+    return refuse('persist_failed');
+   }
+   const ack = {ok: true, command_id: command.command_id, revision, changed: true, state: null};
+   lastCancel = {command_id: command.command_id, operation: command.operation, ack};
+   return {...ack};
   }
   // A finished match is frozen: no scoring, clock, reset or second finish may
   // touch it. Only a replay of an already accepted command answers (above).
@@ -349,6 +391,9 @@ function createStore(options = {}) {
    const before = remember();
    assignment = structuredClone(payload);
    commands = new Map();
+   // A new match clears the retry memory of the previous cancellation: that
+   // command_id belongs to a session that no longer exists.
+   lastCancel = null;
    anchor = null;
    active = {...structuredClone(payload),
     fighter_a: {...payload.fighter_a, points: 0, advantages: 0, penalties: 0},
