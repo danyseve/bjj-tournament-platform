@@ -1,7 +1,8 @@
 # 11 — Publicación segura de la demo externa (Cloudflare Tunnel + Access)
 
 Estado: **PREPARADO, NO PUBLICADO** (2026-10-02). No existe todavía URL externa.
-Bloqueantes en §15. Nada de este documento está aplicado en producción.
+Bloqueantes en §15; §18 recoge la preparación interna de nginx (aplicada y
+validada, sin publicar) y el orden seguro de publicación.
 
 ## 1. Objetivo
 
@@ -248,15 +249,19 @@ Verificación adicional tras cerrar: `docker ps` sin cambios y
 
 ## 15. Bloqueantes y decisiones pendientes
 
-1. **Sin cuenta/dominio Cloudflare en Robledo** → la estrategia A (hostname
-   estable + Access completo) no se puede ejecutar. Alternativa B operativa.
-2. **Falta autorización de correos**: la demo autenticada necesita al menos un
-   correo real en la allow-list (el del propio titular para la prueba controlada).
-   No se usa ni se inventa ningún correo sin autorización expresa, y la prueba
-   externa exige además leer el OTP en el buzón.
-3. **Cambio de nginx no aplicado** (diseñado y validado): sin él la demo no
-   muestra el Tatami 1. Requiere autorización por ser un cambio en el frontal
-   productivo (backup + `nginx -t` + recarga controlada).
+1. ~~Sin cuenta/dominio Cloudflare en Robledo~~ **RESUELTO (2026-10-02)**: la
+   cuenta y la zona `opsforge.cc` están operativas, el túnel gestionado
+   `opsforge-oracle` está `healthy` y `bjjvetusta.opsforge.cc` ya se publica por él
+   con Access/OTP. No queda bloqueante de plataforma.
+2. **Falta autorización de correos** — **bloqueante ÚNICO actual**: la app de
+   Tatami 1 se creará con allow-list explícita (no con OTP abierto), así que
+   necesita al menos un correo autorizado, el del titular para la prueba
+   controlada. No se usa ni se inventa ninguno, y la prueba externa exige además
+   leer el OTP en el buzón.
+3. ~~Cambio de nginx no aplicado~~ **APLICADO INTERNAMENTE en P2.6A.2-prep**
+   (`nginx/conf.d/tatami1.conf`, server propio por `server_name`), con backup,
+   `nginx -t` y `nginx -s reload` sin recrear el contenedor. Sin DNS ni ingress el
+   hostname **no** es alcanzable desde Internet: publicarlo sigue pendiente (§18).
 4. ~~**Match 1 residual `ready`**~~ **RESUELTO en P2.6A.1 (2026-10-02)**: la
    operación administrativa `cancel_assignment` libera un combate asignado por
    error que nunca ha arrancado (rama `command.operation === 'cancel_assignment'`
@@ -268,8 +273,9 @@ Verificación adicional tras cerrar: `docker ps` sin cambios y
 
 ## 16. Resultado de P2.6A
 
-Preparación completa y verificada; publicación **no** realizada por los
-bloqueantes 1–3. Ver informe de fase.
+Preparación completa y verificada; publicación **no** realizada. Bloqueante 1
+resuelto y bloqueante 3 ya aplicado internamente (P2.6A.2-prep, §18); el único
+bloqueante vivo es la allow-list de correos (§15.2). Ver informe de fase.
 
 ## 17. P2.6A.1 — operación administrativa `cancel_assignment` (CLOSED ✅, 2026-10-02)
 
@@ -307,3 +313,61 @@ Evidencia del cierre sobre producción (2026-10-02):
 - Cero escrituras a Bracket: `POST /tatamis/1/result` → 503
   `result_write_disabled`; métricas del Bracket sin `POST`/`PUT`/`api/token`;
   DB sin cambios (2/25/10/16/9/15, Alembic `c1ab44651e79`).
+
+## 18. P2.6A.2-prep — nginx de Tatami 1 preparado, hostname NO publicado (2026-10-02)
+
+Estado real: **preparación interna hecha, cero exposición**.
+
+- `nginx/conf.d/tatami1.conf` (versionado y activo en el frontal): `server` propio
+  con `server_name tatami1.opsforge.cc` → `http://scoreboard-tatami-1:3000` en la
+  **raíz**, sin retirar prefijos (el scoreboard sirve rutas absolutas), y bloque
+  `/socket.io/` preparado para WebSocket (`proxy_http_version 1.1`,
+  `Upgrade $http_upgrade`, `Connection "upgrade"`, `proxy_buffering off`,
+  `proxy_read_timeout`/`proxy_send_timeout 1h`). `nginx/conf.d/bjj.conf` **intacto**
+  y sigue siendo el server por defecto (`conf.d` se incluye en orden alfabético:
+  `bjj.conf` < `tatami1.conf`), así que un Host no reconocido sigue yendo a Bracket.
+- Evidencia: backup previo en
+  `/home/ubuntu/backups/bjj-tournament-platform/nginx-<ts>/` (`bjj.conf` sha256
+  `7e9ccbe2…`), `nginx -t` correcto, `nginx -s reload` con el **mismo** container ID
+  y `StartedAt` y `restarts=0`. Por `Host: tatami1.opsforge.cc`: `/` 200
+  (`<title>BJJ Scoreboard</title>`), `/control` 200, `/manifest.json` 200,
+  `/css/{bootstrap.min,all,scoreboard}.css` 200, `/js/main.js` 200,
+  `/js/jquery-3.3.1.slim.min.js` 200, `/js/bootstrap.min.js` 200,
+  `/images/icon-256x256.png` 200, `/socket.io/?EIO=4&transport=polling` 200 con
+  `sid` y `upgrades:["websocket"]`, upgrade WebSocket **101**.
+  `Host: bjjvetusta.opsforge.cc` → Bracket correcto (`/` 200, `/api/ping` →
+  `"ping"`): sin regresión. Con un Host desconocido sigue ganando Bracket: el
+  scoreboard no responde fuera de su hostname.
+
+Lo que **no** existe todavía —y por qué el hostname no es alcanzable desde fuera—:
+
+| Pieza | Estado |
+|---|---|
+| Registro DNS `tatami1.opsforge.cc` | **ausente** (0 registros en la zona) |
+| Ingress en el túnel `opsforge-oracle` | **ausente** (solo `bjjvetusta` + catch-all `http_status:404`) |
+| App de Access para Tatami 1 | **ausente** (existe una sola app: la de BJJ) |
+| Correo autorizado en allow-list | **ausente** (bloqueante único, §15.2) |
+
+**Orden seguro de publicación** (NO ejecutado todavía):
+
+1. Crear la app de Access `OpsForge Tatami 1 Demo` para `tatami1.opsforge.cc`, con
+   *deny by default* y allow-list explícita de correos (OTP). **Primero Access.**
+2. Crear el registro DNS `tatami1.opsforge.cc` → CNAME al túnel `opsforge-oracle`,
+   proxied.
+3. Añadir el ingress `tatami1.opsforge.cc → http://127.0.0.1:8080` manteniendo
+   `bjjvetusta.opsforge.cc` y el catch-all `http_status:404`.
+4. Prueba externa: OTP, carga del marcador, Socket.IO, `cancel_assignment`, gate de
+   escritura (`503 result_write_disabled`) y kill switch.
+
+Por qué este orden y no el inverso: Access es *deny by default* **solo para los
+hostnames que tienen app**. Si se publicase antes el DNS o el ingress, entre ese
+momento y la creación de la app el hostname llegaría al origen **sin política**,
+es decir abierto a cualquiera. Crear la app de Access antes de que el nombre
+resuelva cierra esa ventana: el primer paquete ya pasa por la política.
+
+Rollback de esta preparación (sin tocar nada más): borrar
+`nginx/conf.d/tatami1.conf` y `nginx -s reload`, o restaurar el backup
+`nginx-20261002T160118Z`; el hostname no existe en DNS, así que el efecto es
+puramente interno. Con la demo ya publicada, el kill switch es
+deshabilitar/eliminar la app de Access o el ingress de `tatami1` (§13), que solo
+afecta a Tatami y no toca `bjjvetusta`, nginx, la aplicación, la DB ni WireGuard.

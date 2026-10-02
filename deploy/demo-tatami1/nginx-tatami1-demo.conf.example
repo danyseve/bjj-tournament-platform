@@ -1,91 +1,74 @@
 # ==============================================================================
-# PLANTILLA — NO ACTIVA
-# Versión propuesta de nginx/conf.d/bjj.conf para la demo externa de Tatami 1
-# (P2.6A). Validada con `nginx -t` sobre una copia en /tmp del contenedor.
+# PLANTILLA — NO ACTIVA (documental)
 #
-# NO copiar a nginx/conf.d/ sin autorización: ese directorio está montado en el
-# nginx productivo y cualquier fichero allí se activa al recargar.
+# Publicación de Tatami 1 por HOSTNAME PROPIO, según la arquitectura vinculante
+# de OpsForge:  Cloudflare -> tatami1.opsforge.cc -> Access/OTP
+#               -> tunnel opsforge-oracle -> nginx -> scoreboard-tatami-1:3000
 #
-# Cambio respecto al fichero actual: se añaden los bloques del scoreboard
-# (Tatami 1) marcados con [P2.6A]. Los bloques del Bracket no cambian.
+# Esta plantilla es la versión documental de `nginx/conf.d/tatami1.conf`, que es
+# el fichero REAL y activo del frontal productivo. Si se edita uno, hay que
+# editar el otro para que no diverjan.
+#
+# HISTÓRICO (por qué NO se usa el diseño por prefijo de path): en P2.6A se
+# diseñó y validó una variante que servía el scoreboard bajo `/tatami/1/` dentro
+# del server de Bracket (`server_name bjj.local`) y retiraba el prefijo con
+# `proxy_pass .../`. Se descartó: `opsforge.cc` es solo la landing y cada
+# aplicación publicable tiene su propio hostname, de modo que
+# `opsforge.cc/tatami/1/...` (o `bjjvetusta.../tatami/1/...`) no puede ser el
+# acceso final. Con un hostname dedicado el scoreboard queda en la RAÍZ y no hay
+# que retirar ningún prefijo.
+#
+# NO copiar a nginx/conf.d/ : ese directorio está montado en el nginx productivo
+# y cualquier fichero `*.conf` allí se activa al recargar.
 # ==============================================================================
+
 server {
     listen 80;
-    server_name bjj.local;
+    server_name tatami1.opsforge.cc;
 
-    client_max_body_size 50m;
+    # El scoreboard no recibe subidas: límite modesto.
+    client_max_body_size 5m;
 
-    # ------------------------------------------------------------------ [P2.6A]
-    # Tatami 1 — viewer. El prefijo se retira (proxy_pass con "/" final) porque
-    # el scoreboard sirve su UI con rutas absolutas desde la raíz.
-    location = /tatami/1 {
-        return 301 /tatami/1/;
-    }
-
-    location /tatami/1/ {
-        proxy_pass http://scoreboard-tatami-1:3000/;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # Socket.IO dentro de la UI integrada
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 3600s;
-        proxy_buffering off;
-    }
-
-    # Rutas absolutas del scoreboard (assets + socket). No son assets reales del
-    # Bracket (SPA con catch-all: usa /assets/, /api/, /favicon.svg).
+    # Socket.IO / WebSocket: upgrade real y sin buffering.
     location /socket.io/ {
-        proxy_pass http://scoreboard-tatami-1:3000/socket.io/;
+        proxy_pass http://scoreboard-tatami-1:3000;
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_read_timeout 3600s;
         proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
     }
 
-    location /css/    { proxy_pass http://scoreboard-tatami-1:3000/css/; }
-    location /js/     { proxy_pass http://scoreboard-tatami-1:3000/js/; }
-    location /images/ { proxy_pass http://scoreboard-tatami-1:3000/images/; }
-
-    location = /manifest.json {
-        proxy_pass http://scoreboard-tatami-1:3000/manifest.json;
-    }
-
-    # Opcional (primera demo): ocultar el control. NO es una barrera real —
-    # el canal Socket.IO no autentica comandos (ver docs/11 §8) — pero evita
-    # exponer la pantalla de operador.
-    # location = /tatami/1/control  { return 403; }
-    # location = /tatami/1/control2 { return 403; }
-    # --------------------------------------------------------------------------
-
+    # Resto del scoreboard: marcador, /control, /css/, /js/, /images/, manifest.
     location / {
-        proxy_pass http://bracket:8400;
+        proxy_pass http://scoreboard-tatami-1:3000;
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # El resto de peticiones no son upgrades: no forzar Connection.
+        proxy_set_header Connection "";
 
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    location /api/ {
-        proxy_pass http://bracket:8400/api/;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
     }
 }
+
+# Notas operativas
+# ----------------
+# 1) El server de BJJ (`nginx/conf.d/bjj.conf`) NO se toca y sigue siendo el
+#    server por defecto: `conf.d` se incluye en orden alfabético (bjj.conf <
+#    tatami1.conf), así que un Host no reconocido sigue yendo a Bracket.
+# 2) nginx resuelve `scoreboard-tatami-1` al cargar la configuración: si el
+#    contenedor del scoreboard se recrea (IP nueva), hace falta `nginx -s reload`
+#    aunque el nombre DNS sea el mismo.
+# 3) Este server solo responde si el Host ya llega con ese nombre. Sin registro
+#    DNS ni ingress en el túnel, el hostname NO es alcanzable desde Internet.
