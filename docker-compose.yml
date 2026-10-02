@@ -36,7 +36,7 @@ services:
     # El contenedor solo se recrea al ejecutar `docker compose up -d` (P2.5D);
     # P2.5C no ejecuta Compose. Rollback: volver al digest productivo anterior
     #   sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8
-    image: danyseve1/bracket-bjj@sha256:8e9f2ca217c45637f5ffbc0b69c43bd6862ec04cda6a1400a46c22438155e9e1
+    image: danyseve1/bracket-bjj:041fc6c-r1
     container_name: bracket
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
@@ -53,6 +53,11 @@ services:
       - "${BRACKET_PORT:-8400}:8400"
     environment:
       ENVIRONMENT: "PRODUCTION"
+      # USER MANAGEMENT (P2.8): el registro publico esta CERRADO. Las cuentas las
+      # crea un administrador (Administracion -> Usuarios) o el CLI del backend.
+      # No habilitar sin decision de producto explicita.
+      ALLOW_USER_REGISTRATION: "false"
+      ALLOW_DEMO_USER_REGISTRATION: "false"
       PG_DSN: postgresql://${POSTGRES_USER:-bracket_dev}:${POSTGRES_PASSWORD:-change_me}@bracket-postgres:5432/${POSTGRES_DB:-bracket_dev}
       JWT_SECRET: ${JWT_SECRET:-change_me_please_generate_real_secret}
 #      CORS_ORIGINS: "http://172.18.0.4:8400,http://10.0.0.67:8400,http://localhost:8400,http://bjj-bracket.local:8400"
