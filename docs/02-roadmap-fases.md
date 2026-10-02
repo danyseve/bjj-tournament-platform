@@ -39,6 +39,21 @@ La escritura de resultados hacia Bracket sigue **desactivada por diseño**: el p
 modo lectura (`BRACKET_RESULT_WRITE_ENABLED=false`, requisito previo a implementar) y sin credenciales
 de escritura.
 
+## Despliegue controlado de Tatami 1 — P2.5D (CLOSED ✅, 2026-10-02)
+
+Tatami 1 desplegado en producción en tres pasos, cada uno validado antes del siguiente y sin tocar
+PostgreSQL, nginx ni WireGuard: Bracket recreado con el digest release `8e9f2ca2…e9e1`
+(`revision=47bc129d…`, `AUTO_RUN_MIGRATIONS=false`, `healthy`, `restarts=0`); `scoreboard-tatami-1`
+arrancado en modo integrado con persistencia (`state_store {enabled,ready} = true`, `state.json` 0600
+uid 1000, sin puertos publicados); `bjj-bridge-api` arrancado sin puertos publicados, con DNS interno
+resuelto hacia `bracket` y `scoreboard-tatami-1`. Gate de escritura demostrado en producción:
+`POST /tatamis/1/result` → **503 `result_write_disabled`** sin auth, sin lectura y sin `PUT` hacia
+Bracket (set de rutas de `/api/metrics` idéntico antes/después). Candidates 200 coherente con la BD
+(12 de grupo; knockout sin luchadores no son candidatos); `assign-match` 201 con estado `ready` y
+recuperación correcta tras reiniciar solo el scoreboard. Postcheck de BD sin cambios y con el hash
+SHA256 de `matches` idéntico al del backup pre-despliegue: cero modificaciones de datos. Rollback
+preparado y no utilizado. Evidencia en §21 de `docs/10-plan-release-tatami1.md`.
+
 ## Pre-despliegue final y GO/NO-GO — P2.5C (GO, sin desplegar)
 
 Publicadas las tres imágenes release (`danyseve1/bracket-bjj:47bc129-r3`,

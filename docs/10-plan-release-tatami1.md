@@ -752,9 +752,67 @@ PostgreSQL se restauraría con el runbook existente (`docs/04-backup-restore.md`
 | 17 | Tatami 2–6 fuera del render | YES |
 | 18 | WireGuard fuera de cambio | YES |
 
-### 20.10 Estado final
+### 20.10 Estado final de P2.5C
 
 Producción intacta: los cuatro contenedores conservan **mismos IDs y `StartedAt`** y `restarts=0`; el
-Bracket en ejecución sigue siendo la imagen `sha256:e07ec8b4…8df8` (`revision=e6abd7d…`). No se ejecutó
+Bracket en ejecución seguía siendo la imagen `sha256:e07ec8b4…8df8` (`revision=e6abd7d…`). No se ejecutó
 `docker compose up`, ni `recreate`, ni `restart`, ni `pull` seguido de `up`, ni cambios en nginx.
 P2.5C termina **antes** del despliegue.
+
+### 21. P2.5D — despliegue de Tatami 1 en producción (2026-10-02)
+
+Ejecutado el despliegue controlado, en orden Bracket → scoreboard → Bridge, sin tocar PostgreSQL, nginx
+ni WireGuard, y con `BRACKET_RESULT_WRITE_ENABLED=false` durante todo el proceso.
+
+#### 21.1 Contenedores desplegados (IDs reales)
+
+| Servicio | Container ID | Imagen (digest) | StartedAt (UTC) |
+| --- | --- | --- | --- |
+| `bracket` (recreado) | `19e1f86a7f41178afba25b2bb67e13841e069826b9c9744f1d36354dd0605fcb` | `danyseve1/bracket-bjj@sha256:8e9f2ca217c45637f5ffbc0b69c43bd6862ec04cda6a1400a46c22438155e9e1` | 2026-10-02T10:35:28Z |
+| `scoreboard-tatami-1` (nuevo) | `231af7821f68f19aa7eb91174d36b65a8299d08faa82c5a2feb406e68569bf26` | `danyseve1/bjj-scoreboard@sha256:024f0d5bf14c0891b0a2e3f3766d74381768379bd6e8a1f055d99a3f3e33074e` | 2026-10-02T10:36:25Z |
+| `bjj-bridge-api` (nuevo) | `3111ec8966f11738fc8387582e2b26a89a7f527adb0885bbd575b8309944c083` | `danyseve1/bjj-bridge-api@sha256:6b6d5327118f98b2bed3fe5ac88ec0109216bf3d7f6f04942eeaaac8b1b437f6` | 2026-10-02T10:37:32Z |
+
+Intactos (mismo ID y `StartedAt` que en P2.5C): `bracket-postgres` `0283c07f4d4b…`,
+`bjj-nginx` `4d8d8390fcab…`, `wireguard` `c749d6966735…`, los tres con `restarts=0`.
+
+#### 21.2 Checks ejecutados
+
+- Bracket: `healthy`, `restarts=0`, `revision=47bc129d…`, `AUTO_RUN_MIGRATIONS=false`, arm64, usuario
+  `bracket`; `/api/ping` OK desde el host, desde nginx y por la ruta pública (`8080` → 200).
+- Scoping DEF-01 en producción: `GET /api/tournaments/1/stages` → 2 stages / 3 stage_items / 8 rondas,
+  **exactamente** lo que dice la BD, sin elementos fuera de alcance. Torneo 2 responde 401
+  (`page is not publicly available`), comportamiento del producto.
+- Scoreboard: `healthy`, `SCOREBOARD_MODE=integrated`, `state_store {enabled: true, ready: true}`,
+  sin puertos publicados, en `bjj-net` (172.30.0.3); `state.json` 0600, uid 1000.
+- Bridge: `healthy`, sin puertos publicados (172.30.0.4), resuelve `bracket` (172.30.0.20) y
+  `scoreboard-tatami-1`; `Bridge → Bracket /api/ping` = `"ping"` y `Bridge → scoreboard /health` = OK.
+- Gate WRITE: `POST /tatamis/1/result` → **HTTP 503** `{"status":"failed","reason":"result_write_disabled"}`;
+  el set de rutas del Bracket en `/api/metrics` quedó idéntico (9 claves, cero `POST /api/token`, cero
+  `PUT`), es decir sin auth, sin GET y sin PUT hacia Bracket. Credenciales `BRACKET_WRITE_*` vacías.
+- Candidates: `GET /tatamis/1/candidates?tournament_id=1` → 200, `scoreboard_read=true`, 12 candidatos
+  (los 12 combates de grupo de los stage_items 1 y 2; los 3 de knockout sin luchadores resueltos no son
+  candidatos), coherente con la BD.
+- Prueba funcional: `assign-match` → **201** `assigned`, `scoreboard_sent=true`, match 1
+  (Team 1 vs Team 4, Group A, 600 s); estado `session_id=869b7be2-…`, `revision=1`, `status=ready`;
+  UI integrada interna `GET /` → 200 con HTML.
+- Persistencia: reinicio **solo** del scoreboard → mismo `session_id`, `revision=1`, `match_id=1`,
+  `status=ready`, mismos luchadores y duración; `healthy` de nuevo; el resto de contenedores sin tocar.
+- DB postcheck: PostgreSQL 16.14 · Alembic `c1ab44651e79` · 2 torneos · 25 matches · 10 equipos ·
+  16 rondas · 15 tablas (**sin cambios**). Hash SHA256 de las 25 filas × 18 columnas de `matches`
+  idéntico al del backup pre-despliegue (`570d31d4…e46f7`): **cero modificaciones de datos**.
+- Logs de los tres servicios: 0 tracebacks/errores, 0 auth fallida, 0 claves filtradas; en el Bridge
+  consta el `503` esperado (y un `422` de una llamada de prueba mal formada del operador, no del producto).
+- Rollback: **no necesario**, no utilizado.
+
+#### 21.3 Estado residual
+
+El match 1 queda **asignado** en el scoreboard del Tatami 1 (estado `ready`), porque `clear_match` solo
+se acepta con `status === 'finished'` y no se forzó ni se falseó el estado. Se limpia desde la propia UI
+o cerrando el combate cuando el operador lo decida. No hay nada escrito en Bracket: el flujo de
+publicación de resultados sigue desactivado.
+
+#### 21.4 Rollback preparado (no ejecutado)
+
+Los comandos de §20.8 siguen válidos: restaurar el `docker-compose.yml` del backup, `docker compose up -d
+--no-deps bracket` (vuelve a `sha256:e07ec8b4…8df8`), `stop`/`rm -f` del Bridge y del scoreboard
+(conservando `/state`), y restaurar el `.env` previo.
