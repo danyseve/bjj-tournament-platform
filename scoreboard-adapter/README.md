@@ -1,4 +1,4 @@
-# Scoreboard adapter — P2.3B
+# Scoreboard adapter — P2.3E
 
 Wrapper del repositorio principal; no cambia el submódulo ni conecta Bridge.
 
@@ -65,15 +65,94 @@ los campos de la asignación, añade a cada fighter `points`, `advantages` y
 ```
 
 Cada instancia acepta una única asignación; no hay transición al siguiente
-match, reset, reloj ni API pública de mutación. Reiniciar el proceso pierde el
+match ni API pública HTTP de mutación: el estado vivo cambia solo por comandos
+canónicos del socket (ver *Marcador canónico*). Reiniciar el proceso pierde el
 estado en memoria. Cada nueva asignación en una instancia vacía genera UUID.
 Payload aceptado, respuesta y lecturas son copias profundas independientes.
+
+## Marcador canónico (P2.3E)
+
+El servidor integrated es la única fuente de verdad del combate en vivo (estado
+canónico, scoring y reloj). El Bridge solo adapta y la UI solo presenta
+snapshots: el navegador no mantiene contabilidad autoritativa.
+
+`tatami:update` (Socket.IO cliente → servidor) con ack. Ejemplo:
+
+```json
+{
+  "session_id": "UUID del snapshot",
+  "command_id": "UUID del cliente",
+  "expected_revision": 7,
+  "tatami_id": 1,
+  "match_id": 40,
+  "operation": "score_delta",
+  "fighter": "a",
+  "field": "points",
+  "delta": 2
+}
+```
+
+Operaciones implementadas (`reset` usa solo las seis claves base; el conjunto de
+claves por operación es exacto, así que un campo desconocido o faltante rechaza
+el comando):
+
+- `score_delta`: `fighter` `a|b`, `field` `points|advantages|penalties`, `delta`
+  entero distinto de 0 y `|delta| <= 100`. El resultado nunca queda negativo ni
+  supera 1000: se **rechaza**, nunca se recorta en silencio.
+- `set_running`: `running` booleano explícito (no es un toggle). Idempotente:
+  repetir el estado actual no cambia nada. Arranca desde `ready` o `paused`;
+  pedir arranque de un combate `finished` se rechaza.
+- `reset`: detiene el reloj, restaura `remaining_seconds = duration_seconds`,
+  pone scoring a 0, conserva combate, asignación, participantes y `session_id`,
+  e incrementa `revision`.
+- `finish` no está implementado; `winner_team_id` y `method` siguen `null`.
+
+Ack de éxito `{ "ok": true, "command_id": "...", "revision": 7 }`; de error
+`{ "ok": false, "code": "stale_revision", "revision": 8 }`. Códigos:
+`invalid_command` (forma, claves o tipos), `invalid_operation` (operación no
+implementada o valor no permitido), `wrong_session`, `wrong_match`,
+`stale_revision`, `unauthorized`.
+
+Idempotencia: cada `command_id` aceptado se recuerda (memoria acotada a 256
+comandos por sesión, se vacía al asignar). Un replay devuelve el ack original y
+**no** reaplica la operación, aunque llegue con revisión antigua; solo se
+registran comandos aceptados, de modo que un comando rechazado puede
+reintentarse. Todo comando aceptado que cambia estado incrementa `revision += 1`
+y un `expected_revision` distinto se rechaza sin mutar (`stale_revision`).
+
+Reloj autoritativo: `remaining_seconds` es el valor congelado y el reloj guarda
+un ancla monotónica (`performance.now()`) al arrancar; cada snapshot calcula el
+restante real y al pausar se congela el calculado. No hay decremento por segundo
+como fuente temporal, no se admiten valores negativos y al llegar a 0 el estado
+pasa a `finished` con `remaining_seconds = 0`. No hay persistencia: reiniciar el
+proceso pierde el estado.
+
+## Control autorizado
+
+`tatami:update` exige credencial de control: `SCOREBOARD_CONTROL_TOKEN` (entorno,
+distinto del token interno del Bridge, nunca hardcodeado, nunca en query string,
+nunca en logs). Las páginas `/control` y `/control2` la reciben como cookie
+`HttpOnly` + `SameSite=Strict` (`scoreboard_control`), que el navegador envía en
+el handshake; el servidor la compara en tiempo constante. Sin secreto
+configurado o sin cookie válida, todo `tatami:update` responde `unauthorized` y
+el estado no cambia (fail-closed). La pantalla `/` no recibe credencial y sigue
+recibiendo `tatami:state`. Ningún script de la página lee la cookie y el token
+interno del Bridge no se expone al navegador. Modelo de confianza: abrir una
+página de control en la red interna concede autoridad de control; la
+autenticación por operador queda fuera de esta fase.
+
+En la UI integrada los controles legacy se mapean a operaciones canónicas
+(scoring → `score_delta`; iniciar/pausar → `set_running` con el booleano derivado
+del `status` del servidor; reset → `reset`), y los controles sin operación
+canónica (nombres y ±minuto) siguen bloqueados. La UI integrada no emite eventos
+legacy; standalone sigue usando el sistema legacy intacto.
 
 ## Socket.IO y compatibilidad
 
 `tatami:state` lleva el snapshot directamente (no el envelope HTTP), se envía a
-cada nueva conexión cuando existe estado y se difunde a todos tras 201 o replay
-200. No se emite si el estado está vacío ni tras error. No existe `tatami:update`.
+cada nueva conexión cuando existe estado y se difunde a todos tras 201, replay
+200, cada comando aceptado y una vez por segundo mientras el reloj corre. No se
+emite si el estado está vacío ni tras error.
 
 Los cuatro relays originales permanecen:
 `bjj:score`, `bjj:restart`, `bjj:start` usan `io.sockets.emit` e incluyen emisor;
@@ -94,8 +173,10 @@ NODE_PATH=/home/ubuntu/.cache/scoreboard-p23b/node_modules \
  --test scoreboard-adapter/tests/adapter.test.js
 ```
 
-15 casos con `node:test`, HTTP real y Engine.IO/Socket.IO polling sin cliente
-adicional. El test de no-reset instrumenta el módulo en un VM únicamente en
+60 casos con `node:test` (18 `adapter.test.js`, 16 `ui.test.js` con jsdom, 26
+`tatami.test.js` del marcador canónico), HTTP real y Engine.IO/Socket.IO polling
+sin cliente adicional. Los tests de reloj inyectan un reloj monotónico falso, sin
+sleeps. El test de no-reset instrumenta el módulo en un VM únicamente en
 pruebas; no añade exports/endpoints de mutación al runtime. Evidencias verticales
 red/green por caso en el cache (`01-red.tap` … `15-green.tap`).
 

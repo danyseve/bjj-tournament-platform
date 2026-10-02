@@ -32,7 +32,7 @@ function harness(html,code) {
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  return {dom,w,doc:w.document,handlers,emits,timers,registrations,code};
 }
-const snapshot=(extra={})=>({session_id:'synthetic-session-a',revision:1,duration_seconds:305,remaining_seconds:305,status:'ready',fighter_a:{name:'Synthetic <Ana>',points:4,advantages:2,penalties:1},fighter_b:{name:'Synthetic Bea',points:7,advantages:1,penalties:3},...extra});
+const snapshot=(extra={})=>({session_id:'synthetic-session-a',revision:1,tatami_id:1,match_id:400,duration_seconds:305,remaining_seconds:305,status:'ready',fighter_a:{name:'Synthetic <Ana>',points:4,advantages:2,penalties:1},fighter_b:{name:'Synthetic Bea',points:7,advantages:1,penalties:3},...extra});
 function presentation(p) {
  return {names:[1,2].map(i=>p.doc.querySelector('#fighter-'+i+'-name').value),time:p.doc.querySelector('.timer').textContent,scores:[1,2].map(i=>['score','adv','penal'].map(k=>p.doc.querySelector('.fighter-'+i+'-'+k).textContent)),mode:p.doc.querySelector('#integrated-mode')?.textContent};
 }
@@ -87,19 +87,17 @@ test('UI04 a new session resets all presentation even with a lower revision',asy
  assert.ok([...p.doc.querySelectorAll('.points-score')].every(n=>n.textContent==='—'),'per-technique breakdown is not supplied by snapshot');
 });
 
-test('UI05 legacy editing scoring duration start restart controls are disabled, including icon controls',async t=>{
- const {url}=await running(t);
- for(const route of ['/','/control','/control2']) {
-  const p=await page(url,route);
-  for(const n of p.doc.querySelectorAll('input,button,#start,#restart,[id^="add"],[id^="sub"]')) {
-   assert.equal(n.getAttribute('aria-disabled'),'true',route+' '+n.id);
-   assert.equal(n.getAttribute('tabindex'),'-1');
-   if(n.matches('input,button'))assert.equal(n.disabled,true);
-   n.dispatchEvent(new p.w.Event('click',{bubbles:true}));n.dispatchEvent(new p.w.Event('keyup',{bubbles:true}));
-  }
-  assert.deepEqual(p.emits,[]);
-  assert.ok(!p.registrations.some(([event])=>['click','keyup','keydown','change'].includes(event)));
+test('UI05 la pantalla / es solo lectura con combate activo: bloquea todo y no emite nada',async t=>{
+ const {url}=await running(t),p=await page(url,'/');
+ p.handlers['tatami:state'](snapshot());
+ for(const n of p.doc.querySelectorAll('input,button,#start,#restart,[id^="add"],[id^="sub"]')) {
+  assert.equal(n.getAttribute('aria-disabled'),'true','/'+' '+n.id);
+  assert.equal(n.getAttribute('tabindex'),'-1');
+  if(n.matches('input,button'))assert.equal(n.disabled,true);
+  n.dispatchEvent(new p.w.Event('click',{bubbles:true}));n.dispatchEvent(new p.w.Event('keyup',{bubbles:true}));
  }
+ assert.deepEqual(p.emits,[]);
+ assert.ok(!p.registrations.some(([event])=>['click','keyup','keydown','change'].includes(event)));
 });
 
 test('UI06 explicit empty snapshot clears presentation and revision tracking',async t=>{
@@ -119,13 +117,12 @@ test('UI07 snapshot presentation creates no countdown timers and never autoruns'
  assert.deepEqual(p.timers,[]);assert.equal(presentation(p).time,'02:05');
  assert.ok(!/set(?:Timeout|Interval)|new Timer|startTimer/.test(p.code));
 });
-test('UI08 only tatami:state is registered; no legacy listeners or outbound events',async t=>{
- const {url}=await running(t);
- for(const route of ['/','/control','/control2']) {
-  const p=await page(url,route);p.handlers['tatami:state'](snapshot());
-  assert.deepEqual(Object.keys(p.handlers),['tatami:state']);assert.deepEqual(p.emits,[]);
-  assert.ok(!/bjj:|tatami:update|socket\.emit/.test(p.code));
- }
+test('UI08 la pantalla / solo se suscribe a tatami:state y el cliente integrado no usa bjj:*',async t=>{
+ const {url}=await running(t),p=await page(url,'/');
+ p.handlers['tatami:state'](snapshot());
+ assert.deepEqual(Object.keys(p.handlers),['tatami:state']);
+ assert.deepEqual(p.emits,[]);
+ assert.ok(!/bjj:/.test(p.code),'el cliente integrado no usa eventos legacy');
 });
 const assignment=()=>({tournament_id:77,match_id:400,tatami_id:1,fighter_a:{stage_item_input_id:1,team_id:101,name:'Synthetic Ana',club:null},fighter_b:{stage_item_input_id:2,team_id:102,name:'Synthetic Bea',club:null},category:{stage_item_id:9,name:'Synthetic Adult'},duration_seconds:305});
 async function assign(url) {
@@ -186,4 +183,82 @@ test('UI12 default standalone serves original main JS and all legacy assets byte
   assert.deepEqual(Buffer.from(await res.arrayBuffer()),fs.readFileSync(path.join(legacyRoot,'public',relative)));
  }
  child.kill();await stopped;
+});
+
+const SCORING={add4f1:['a','points',4],sub4f1:['a','points',-4],add3f1:['a','points',3],sub3f1:['a','points',-3],add2f1:['a','points',2],sub2f1:['a','points',-2],
+ addadvf1:['a','advantages',1],subadvf1:['a','advantages',-1],addpenalf1:['a','penalties',1],subpenalf1:['a','penalties',-1],
+ add4f2:['b','points',4],sub4f2:['b','points',-4],add3f2:['b','points',3],sub3f2:['b','points',-3],add2f2:['b','points',2],sub2f2:['b','points',-2],
+ addadvf2:['b','advantages',1],subadvf2:['b','advantages',-1],addpenalf2:['b','penalties',1],subpenalf2:['b','penalties',-1]};
+const PAYLOAD_KEYS=['command_id','delta','expected_revision','field','fighter','match_id','operation','session_id','tatami_id'];
+const click=(p,id)=>p.doc.querySelector('#'+id)?.dispatchEvent(new p.w.Event('click',{bubbles:true}));
+
+test('UI13 las paginas de control emiten tatami:update canonico mapeado desde los controles legacy',async t=>{
+ const {url}=await running(t);
+ for(const route of ['/control','/control2']) {
+  const p=await page(url,route);p.handlers['tatami:state'](snapshot());
+  const present=Object.keys(SCORING).filter(id=>p.doc.querySelector('#'+id)!==null);
+  assert.ok(present.length>=8,route+' expone controles de scoring');
+  present.forEach(id=>click(p,id));
+  assert.equal(p.emits.length,present.length,route+' un comando por clic');
+  p.emits.forEach(([event,payload],index)=>{
+   assert.equal(event,'tatami:update');
+   assert.equal(payload.operation,'score_delta',present[index]);
+   assert.equal(payload.session_id,'synthetic-session-a');
+   assert.equal(payload.expected_revision,1);
+   assert.equal(payload.tatami_id,1);
+   assert.equal(payload.match_id,400);
+   assert.equal(typeof payload.command_id,'string');
+   assert.ok(payload.command_id.length>0);
+   assert.deepEqual(Object.keys(payload).sort(),PAYLOAD_KEYS,present[index]+' sin campos desconocidos');
+   assert.deepEqual([payload.fighter,payload.field,payload.delta],SCORING[present[index]],present[index]);
+  });
+  assert.equal(new Set(p.emits.map(([,payload])=>payload.command_id)).size,present.length,'command_id unico por comando');
+ }
+});
+
+test('UI14 iniciar, pausar y reset usan operaciones explicitas y no toggle',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state'](snapshot({status:'ready'}));
+ click(p,'start');
+ p.handlers['tatami:state'](snapshot({revision:2,status:'running',remaining_seconds:300}));
+ click(p,'start');
+ click(p,'restart');
+ assert.deepEqual(p.emits.map(([event,payload])=>[event,payload.operation,payload.running===undefined?null:payload.running]),
+  [['tatami:update','set_running',true],['tatami:update','set_running',false],['tatami:update','reset',null]]);
+ assert.deepEqual(Object.keys(p.emits[2][1]).sort(),['command_id','expected_revision','match_id','operation','session_id','tatami_id']);
+ assert.equal(p.emits[1][1].expected_revision,2,'la revision esperada sigue al ultimo snapshot del servidor');
+});
+
+test('UI15 sin sesion no se emite y los controles sin operacion canonica siguen bloqueados',async t=>{
+ const {url}=await running(t);
+ for(const route of ['/control','/control2']) {
+  const p=await page(url,route);
+  for(const id of ['add4f1','add2f2','start','restart'])click(p,id);
+  assert.deepEqual(p.emits,[],route+' sin snapshot no emite comandos');
+  p.handlers['tatami:state'](snapshot());
+  for(const id of ['addmin','submin','fighter-1-name','fighter-2-name']) {
+   const n=p.doc.querySelector('#'+id);if(n===null)continue;
+   assert.equal(n.getAttribute('aria-disabled'),'true',route+' '+id);
+   if(n.matches('input,button'))assert.equal(n.disabled,true);
+   n.dispatchEvent(new p.w.Event('click',{bubbles:true}));n.dispatchEvent(new p.w.Event('keyup',{bubbles:true}));
+  }
+  assert.deepEqual(p.emits,[],route+' los controles sin operacion no emiten');
+  for(const id of ['add4f1','start','restart']) {
+   const n=p.doc.querySelector('#'+id);if(n===null)continue;
+   assert.notEqual(n.getAttribute('aria-disabled'),'true',route+' '+id+' habilitado con sesion');
+   assert.ok(!n.disabled,route+' '+id+' habilitado con sesion');
+  }
+ }
+});
+
+test('UI16 el control refleja el status del servidor y no admite retrocesos',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state'](snapshot({status:'running',remaining_seconds:120}));
+ assert.equal(presentation(p).time,'02:00');
+ assert.match(p.doc.querySelector('#start').getAttribute('class')||'',/pause/);
+ p.handlers['tatami:state'](snapshot({revision:3,status:'paused',remaining_seconds:120}));
+ assert.match(p.doc.querySelector('#start').getAttribute('class')||'',/play/);
+ p.handlers['tatami:state'](snapshot({revision:2,status:'running',remaining_seconds:300}));
+ assert.equal(presentation(p).time,'02:00','un snapshot antiguo no reanuda la presentacion');
+ assert.equal(presentation(p).mode.includes('paused'),true);
 });
