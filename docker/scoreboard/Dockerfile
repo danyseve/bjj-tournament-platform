@@ -22,8 +22,8 @@ COPY --chown=node:node services/scoreboard/app.js ./app.js
 COPY --chown=node:node services/scoreboard/routes/ ./routes/
 COPY --chown=node:node services/scoreboard/views/ ./views/
 COPY --chown=node:node services/scoreboard/public/ ./public/
-COPY --chown=node:node scoreboard-adapter/launcher.js scoreboard-adapter/integrated.js scoreboard-adapter/state.js ./scoreboard-adapter/
-RUN node --check scoreboard-adapter/launcher.js && node --check scoreboard-adapter/integrated.js && node --check scoreboard-adapter/state.js
+COPY --chown=node:node scoreboard-adapter/launcher.js scoreboard-adapter/integrated.js scoreboard-adapter/state.js scoreboard-adapter/integrated-ui.js ./scoreboard-adapter/
+RUN node --check scoreboard-adapter/launcher.js && node --check scoreboard-adapter/integrated.js && node --check scoreboard-adapter/state.js && node --check scoreboard-adapter/integrated-ui.js
 RUN node --check app.js && node --check routes/index.js && node --check public/js/main.js
 
 EXPOSE 3000

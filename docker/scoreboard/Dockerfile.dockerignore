@@ -16,6 +16,7 @@
 !scoreboard-adapter/launcher.js
 !scoreboard-adapter/integrated.js
 !scoreboard-adapter/state.js
+!scoreboard-adapter/integrated-ui.js
 **/.git
 **/.git/**
 **/.env

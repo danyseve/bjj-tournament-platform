@@ -18,6 +18,7 @@ function createServer(legacyRoot = '/app') {
  app.use(express.json());
  app.use(express.urlencoded({extended: false}));
  app.use(cookieParser());
+ app.get('/js/main.js', (req, res) => res.sendFile(path.join(__dirname, 'integrated-ui.js')));
  app.use(express.static(path.join(legacyRoot, 'public')));
  const server = http.createServer(app);
  const io = new Server(server);
