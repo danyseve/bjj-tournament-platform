@@ -149,6 +149,30 @@ el procedimiento `cloudflare-bjj-access`, nunca tocando DNS, túnel, ingress ni 
 - Cabeceras en el `server_name` de docs: `X-Content-Type-Options`, `X-Frame-Options`,
   `Referrer-Policy`, y cache corta para estáticos.
 
+## Diagnostico rapido: `Error 525`/`522` en un hostname ya publicado
+
+Sintoma tipico: el navegador con sesion de Access devuelve `Cloudflare Error 525 — SSL handshake failed`
+mientras los sondeos anonimos dan 302 (Access responde en el edge antes de enrutar, y tapa el fallo).
+
+Orden de comprobacion:
+
+1. **Origen**: en el host donde corre `cloudflared`,
+   `curl -sS -o /dev/null -w '%{http_code}' -H 'Host: <host>' http://127.0.0.1:8080/<ruta>` debe dar
+   **200**. El puerto publicado vive en el host de cloudflared, no en el CT de gestion.
+2. **CNAME**: leer el `content` **exacto** por API (no `dig`: un registro proxied oculta el target) y
+   compararlo caracter a caracter con `<TUNNEL_UUID>.cfargotunnel.com`. Un target `...cargotunnel.com`
+   (sin la `f`) es un dominio de terceros (AWS) y produce 525.
+3. **Ingress del túnel**: `docs.opsforge.cc -> http://127.0.0.1:8080` (HTTP local, nunca `https://` ni el
+   hostname publico), antes del catch-all, `warp-routing` intacto.
+4. **Edge**: `curl -sS -D - -o /dev/null https://docs.opsforge.cc/` -> 302 +
+   `www-authenticate: Cloudflare-Access`.
+
+Un target mal escrito **no** se arregla cambiando el SSL mode, abriendo 443 ni instalando certificados:
+el túnel cifra la pata cloudflared<->Cloudflare y el origen sigue siendo HTTP local. La prueba final
+(carga real con sesion) la hace una persona con navegador.
+
+Incidente de origen: `docs/11-demo-externa-cloudflare.md` §23 (2026-10-02, resuelto).
+
 ## Pendientes (mini-tareas, no bloquean el cierre)
 
 1. **Enlace "? Manual" en `/control`** (no se ha tocado la UI del Tatami, a propósito): el

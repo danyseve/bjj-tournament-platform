@@ -584,3 +584,50 @@ Matriz de acceso resultante (leída de la API y verificada por read-back):
   enmascara las identidades en toda su salida.
 - **Rollback**: devolver `docs`/`bracket` al modelo restringido con `add <host> <email>` sobre la
   policy abierta (allow-list explícita) y restaurar la sesión de `docs` a 168 h.
+## 23. Incidente de produccion: `Error 525` en `docs.opsforge.cc` (RESUELTO, 2026-10-02)
+
+**Sintoma**: un navegador **con sesion de Access** recibe `Cloudflare Error 525 — SSL handshake failed`
+en `https://docs.opsforge.cc/bjj/bracket/` y en **todas** las rutas del centro de documentacion.
+La pantalla de error marca Browser: Working / Cloudflare: Working / Host: Error.
+
+**Causa raiz**: el CNAME de `docs.opsforge.cc` (y tambien el de `bracket.opsforge.cc`) apuntaba a
+`8885941a-4cc9-4e05-a302-e0228c9fd146.cargotunnel.com` — **sin la `f`**. `cargotunnel.com` es un dominio real de terceros que resuelve
+a IPs de AWS (54.243.117.197, 13.223.25.84), asi que Cloudflare trataba ese target como un **origen
+normal**, negociaba TLS contra el y devolvia 525. Con el target correcto la conexion va por el túnel y no
+hay handshake TLS contra el origen.
+
+**Por que paso desapercibido**: Cloudflare Access se evalua en el **edge antes** de enrutar al túnel, asi
+que los sondeos anonimos devolvian 302 al login y el fallo del origen quedaba tapado. El error solo
+aparecia con sesion autenticada. El target ademas **nunca debe teclearse**: se copia de un hostname ya
+publicado.
+
+**Correccion aplicada (solo DNS, 1 cambio atomico por hostname con read-back)**:
+`PATCH /zones/{zone}/dns_records/{id}` -> `content = 8885941a-4cc9-4e05-a302-e0228c9fd146.cfargotunnel.com`, `proxied: true`,
+`ttl: 1` (auto). Toca **dos** registros: `docs.opsforge.cc` y `bracket.opsforge.cc`.
+`bjjvetusta.opsforge.cc` y `tatami1.opsforge.cc` ya tenian el target correcto y **no se tocaron**.
+
+**No se cambio**: SSL mode (ni Flexible, ni Full/Strict, ni certificados, ni 443, ni listener HTTPS,
+ni `noTLSVerify`), ingress del túnel, nginx, politicas Access, Bracket/Tatami, DB, WireGuard, WRITE.
+
+**Evidencia del diagnostico**:
+- Origen (host de cloudflared, `Host` exacto): `http://127.0.0.1:8080/` -> 200; listener real en
+  `ss -ltnp` -> el bug no era de nginx ni de la app.
+- Ingress: `docs.opsforge.cc -> http://127.0.0.1:8080` (HTTP, no HTTPS), ruta antes del catch-all,
+  catch-all ultimo, `warp-routing` intacto, túnel `healthy` con 4 conexiones.
+- Edge: 302 + `www-authenticate: Cloudflare-Access` + `cf-ray` (sin `cf-error-type`) en los 4 hostnames.
+- Analitica de borde (conteo de respuestas por estado): **NOT TESTED** — el token de zona no tiene
+  `zone.analytics.read` (respuesta `authz`).
+
+**Regla derivada (aplicable a cualquier hostname de la zona)**: el target de un Cloudflare Named Tunnel
+es siempre `<TUNNEL_UUID>.cfargotunnel.com`; el read-back compara el `content` **caracter a caracter**
+contra el UUID del túnel — no basta con "existe un CNAME proxied" — y la auditoria cubre **todos** los
+CNAME de la zona, no solo el que falla. Un target `<uuid>.cargotunnel.com` (sin la `f`) produce 525 para
+cualquier cliente con sesion y es invisible a los sondeos anonimos.
+
+**Pendiente de cierre por el usuario**: la carga real de la pagina con sesion de Access (es la unica
+prueba que el agente no puede producir sin manejar credenciales).
+
+**Hallazgo no corregido (fuera de alcance)**: `opsforge.cc` (A -> 162.255.119.195, parking del
+registrador) y `www.opsforge.cc` (CNAME -> parkingpage.namecheap.com) no estan servidos por la
+infraestructura propia: responden 522/525. No se toco nada: la landing esta fuera del alcance de esta
+tarea y su politica prohibe modificar `opsforge.cc`.
