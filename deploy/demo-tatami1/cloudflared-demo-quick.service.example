@@ -1,0 +1,63 @@
+# ==============================================================================
+# PLANTILLA — NO ACTIVA (P2.6A)
+# Servicio systemd para publicar la demo mediante Cloudflare Tunnel desde el
+# host (preferido frente a contenedor: el origen es 127.0.0.1:8080 y un
+# contenedor exigiría network_mode: host sin aportar nada).
+#
+# Instalación (requiere autorización):
+#   sudo install -m 0644 cloudflared-demo-quick.service.example \
+#        /etc/systemd/system/cloudflared-demo.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-demo
+#
+# Los correos de la allow-list NO van en este fichero ni en el repositorio:
+#   /etc/cloudflared/demo.env  (0600, root)  ->  ALLOWED_MAILS=prof1@dominio,prof2@dominio
+#
+# Cierre inmediato (rollback, ver docs/11 §13):
+#   sudo systemctl stop cloudflared-demo
+# ==============================================================================
+
+# ------------------------------------------------------------------ QUICK TUNNEL
+# Hostname aleatorio *.trycloudflare.com, OTP al email. Sin cuenta ni dominio.
+# El hostname CAMBIA al reiniciar: sólo para demo temporal.
+[Unit]
+Description=Cloudflare Quick Tunnel - demo BJJ Tatami 1 (solo lectura)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/cloudflared/demo.env
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate \
+    --url http://127.0.0.1:8080 \
+    --allowed-mail ${ALLOWED_MAILS}
+Restart=on-failure
+RestartSec=5
+
+User=cloudflared
+Group=cloudflared
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+
+# --------------------------------------------------------------- TUNNEL GESTIONADO
+# Requiere cuenta Cloudflare + dominio. Hostname estable (demo-bjj.<dominio>) y
+# Access completo (allow-list, OTP, duración de sesión).
+# Credenciales: /etc/cloudflared/<UUID>.json en 0600 root (creadas por
+# `cloudflared tunnel create bjj-demo-robledo`). Nunca en el repositorio.
+#
+# [Service]
+# Type=simple
+# ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate \
+#     --config /etc/cloudflared/config.yml run bjj-demo-robledo
+#
+# /etc/cloudflared/config.yml (0600 root), equivalente en ingress:
+#   tunnel: bjj-demo-robledo
+#   credentials-file: /etc/cloudflared/<UUID>.json
+#   ingress:
+#     - hostname: demo-bjj.<dominio>
+#       service: http://127.0.0.1:8080
+#     - service: http_status:404

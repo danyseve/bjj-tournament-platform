@@ -1,0 +1,91 @@
+# ==============================================================================
+# PLANTILLA — NO ACTIVA
+# Versión propuesta de nginx/conf.d/bjj.conf para la demo externa de Tatami 1
+# (P2.6A). Validada con `nginx -t` sobre una copia en /tmp del contenedor.
+#
+# NO copiar a nginx/conf.d/ sin autorización: ese directorio está montado en el
+# nginx productivo y cualquier fichero allí se activa al recargar.
+#
+# Cambio respecto al fichero actual: se añaden los bloques del scoreboard
+# (Tatami 1) marcados con [P2.6A]. Los bloques del Bracket no cambian.
+# ==============================================================================
+server {
+    listen 80;
+    server_name bjj.local;
+
+    client_max_body_size 50m;
+
+    # ------------------------------------------------------------------ [P2.6A]
+    # Tatami 1 — viewer. El prefijo se retira (proxy_pass con "/" final) porque
+    # el scoreboard sirve su UI con rutas absolutas desde la raíz.
+    location = /tatami/1 {
+        return 301 /tatami/1/;
+    }
+
+    location /tatami/1/ {
+        proxy_pass http://scoreboard-tatami-1:3000/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Socket.IO dentro de la UI integrada
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+        proxy_buffering off;
+    }
+
+    # Rutas absolutas del scoreboard (assets + socket). No son assets reales del
+    # Bracket (SPA con catch-all: usa /assets/, /api/, /favicon.svg).
+    location /socket.io/ {
+        proxy_pass http://scoreboard-tatami-1:3000/socket.io/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+        proxy_buffering off;
+    }
+
+    location /css/    { proxy_pass http://scoreboard-tatami-1:3000/css/; }
+    location /js/     { proxy_pass http://scoreboard-tatami-1:3000/js/; }
+    location /images/ { proxy_pass http://scoreboard-tatami-1:3000/images/; }
+
+    location = /manifest.json {
+        proxy_pass http://scoreboard-tatami-1:3000/manifest.json;
+    }
+
+    # Opcional (primera demo): ocultar el control. NO es una barrera real —
+    # el canal Socket.IO no autentica comandos (ver docs/11 §8) — pero evita
+    # exponer la pantalla de operador.
+    # location = /tatami/1/control  { return 403; }
+    # location = /tatami/1/control2 { return 403; }
+    # --------------------------------------------------------------------------
+
+    location / {
+        proxy_pass http://bracket:8400;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location /api/ {
+        proxy_pass http://bracket:8400/api/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

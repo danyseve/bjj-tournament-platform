@@ -1,5 +1,21 @@
 # 02 - Roadmap por fases
 
+## Publicación segura de la demo externa — P2.6A (preparado, NO publicado · 2026-10-02)
+
+Documento: **`docs/11-demo-externa-cloudflare.md`**. Diseño y validación de la publicación de la
+demo del Tatami 1 mediante Cloudflare Tunnel + allow-list por email, sin abrir puertos inbound en
+Robledo ni exponer servicios internos. `cloudflared 2026.9.3` (arm64) instalado desde el repositorio
+oficial de Cloudflare; origen `http://127.0.0.1:8080` con nginx como único gateway; rutas del Tatami 1
+diseñadas y validadas con `nginx -t` **sin aplicar** (plantillas versionadas en `deploy/demo-tatami1/`,
+fuera del bind mount de nginx). Exposición externa medida con sondas independientes: sólo 22/SSH
+abierto; 8080, 8400, 8500, 3000 y 5432 filtrados → `new inbound ports opened = 0`.
+`BRACKET_RESULT_WRITE_ENABLED=false` intacto (503 `result_write_disabled`, cero PUT al Bracket).
+
+Pendiente para publicar: cuenta/dominio Cloudflare (túnel gestionado) o autorización de correos
+reales (Quick Tunnel con `--allowed-mail`), aplicar el cambio de nginx y resolver el match 1 residual
+en estado `ready` (blocker de UX: `clear_match` sólo actúa sobre un match `finished`).
+
+
 ## Cierre operativo P1.4 — CLOSED ✅ (2026-10-01)
 
 Estado de configuración tras `91760f08e751acfa7597dcf9770e81fe1afb3bb9`:
