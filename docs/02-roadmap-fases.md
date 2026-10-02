@@ -24,6 +24,21 @@ WireGuard: **FUERA DE CAMBIO — imagen funcional, no se modifica ni recrea en P
 `bridge-api` y `scoreboard-tatami-1..6` (perfil `multitatami`) quedan fuera de P1.4; se tratarán en P2.
 Siguiente bloque del roadmap: **P1.5 — TLS interno de nginx**, pendiente de autorización y diseño.
 
+## Plan de release del Tatami 1 — P2.5A (plan, sin ejecutar)
+
+Documento: **`docs/10-plan-release-tatami1.md`**. Define, sin tocar producción, cómo desplegar de forma
+controlada el Bracket corregido (`47bc129`), el Bridge API y el scoreboard integrado del Tatami 1 con
+persistencia: inventario de cambios, imagen release de cada componente, target mínimo de Compose
+(perfil propio `tatami1`, servicios nuevos sin publicar al host), red interna, secretos, orden
+secuencial con gate humano, impacto del recreate de Bracket, rollback por componente, checklist de
+validación y GO/NO-GO.
+
+Estado de producción al planificar (sin cambios desde P1.4): Bracket `e6abd7d-r3` por digest, 4
+contenedores con `restarts=0`, PostgreSQL 16.14 con Alembic `c1ab44651e79`, WireGuard fuera de cambio.
+La escritura de resultados hacia Bracket sigue **desactivada por diseño**: el primer release arranca en
+modo lectura (`BRACKET_RESULT_WRITE_ENABLED=false`, requisito previo a implementar) y sin credenciales
+de escritura.
+
 ## Plan de fases de producto (referencia; no describe lo ya desplegado)
 
 Las fases siguientes conservan el plan original. Su numeración no equivale a los gates operativos P0/P1/P2.
