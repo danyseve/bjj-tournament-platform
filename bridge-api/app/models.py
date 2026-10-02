@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PositiveId = Annotated[int, Field(strict=True, gt=0)]
+ResultStatus = Literal["written", "pending_manual", "conflict", "failed"]
 
 
 class NormalizedFighter(BaseModel):
@@ -72,3 +73,42 @@ class CandidatesResponse(BaseModel):
     active_match_id: PositiveId | None = None
     scoreboard_read: bool
     candidates: list[MatchCandidate]
+
+
+class ResultRequest(BaseModel):
+    """Which fight the caller is asking to publish, and nothing else (P2.4D §10).
+
+    The bridge never accepts points, winner or method from the client: those are
+    read from the live scoreboard state. The caller only identifies the fight it
+    believes is frozen, and the state must agree.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tournament_id: PositiveId
+    match_id: PositiveId
+    session_id: str
+    expected_revision: PositiveId | None = None
+
+    @field_validator("session_id")
+    @classmethod
+    def session_id_not_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("session_id must not be empty")
+        return value
+
+
+class ResultResponse(BaseModel):
+    """Publication outcome. Contains no credential of any kind."""
+
+    tatami_id: Literal[1] = 1
+    status: ResultStatus
+    reason: str | None = None
+    idempotent: bool = False
+    fingerprint: str | None = None
+    tournament_id: PositiveId | None = None
+    match_id: PositiveId | None = None
+    session_id: str | None = None
+    revision: int | None = None
+    winner_team_id: PositiveId | None = None
+    scores: dict | None = None

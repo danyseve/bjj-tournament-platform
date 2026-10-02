@@ -19,17 +19,19 @@ async def test_result_endpoint_refuses_without_touching_bracket(monkeypatch):
     transport = httpx.ASGITransport(app=main.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://bridge") as client:
         response = await client.post("/tatamis/1/result")
-    assert response.status_code == 501
-    assert "disabled" in response.json()["detail"]
-    assert calls == []
+    assert response.status_code in (422, 503), response.status_code
+    assert calls == [], "sin identificacion valida no se toca Bracket"
 
 
-async def test_result_endpoint_is_still_501_for_every_tatami():
+async def test_result_endpoint_serves_only_tatami_1():
+    """P2.4D: el 501 se sustituye por una semantica explicita, solo en el tatami 1."""
     transport = httpx.ASGITransport(app=main.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://bridge") as client:
-        for tatami_id in (1, 2, 6):
-            response = await client.post(f"/tatamis/{tatami_id}/result")
-            assert response.status_code == 501
+        valid = {"tournament_id": 7, "match_id": 40, "session_id": "synthetic-session"}
+        for tatami_id in (2, 6):
+            response = await client.post(f"/tatamis/{tatami_id}/result", json=valid)
+            assert response.status_code == 400, "fuera del tatami 1 sigue rechazado"
+        assert (await client.post("/tatamis/1/result", json=valid)).status_code != 501
 
 
 def test_scoreboard_contract_has_no_result_write_path():

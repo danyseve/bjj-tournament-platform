@@ -287,11 +287,17 @@ async def test_13_listing_never_writes_to_bracket(monkeypatch):
     assert all("/result" not in url for _, url in bracket_requests + scoreboard_requests)
 
 
-async def test_14_the_result_endpoint_is_still_501(monkeypatch):
+async def test_14_the_result_endpoint_is_scoped_to_tatami_1(monkeypatch):
+    """P2.4D sustituye el 501 por una semantica explicita, solo en el tatami 1."""
     transport = httpx.ASGITransport(app=main.app)
     async with RealAsyncClient(transport=transport, base_url="http://bridge") as client:
-        for tatami_id in (1, 2, 6):
-            assert (await client.post(f"/tatamis/{tatami_id}/result")).status_code == 501
+        valid = {"tournament_id": 7, "match_id": 40, "session_id": "synthetic-session"}
+        for tatami_id in (2, 6):
+            response = await client.post(f"/tatamis/{tatami_id}/result", json=valid)
+            assert response.status_code == 400, "fuera del tatami 1 sigue rechazado"
+        first = (await client.post("/tatamis/1/result", json=valid)).status_code
+        assert first != 501, "el 501 ya no existe"
+        assert first in (422, 503), first
 
 
 async def test_15_the_scoreboard_contact_is_read_only_and_legacy_free(monkeypatch):

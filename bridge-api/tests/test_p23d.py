@@ -179,11 +179,12 @@ def test_11_tatami_other_than_one_is_rejected_without_transport(monkeypatch):
 
 
 def test_12_result_endpoint_stays_disabled(monkeypatch):
+    """P2.4D: un body que no identifica el combate no escribe y no abre transporte."""
     from app import main
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: pytest.fail("No transport"))
     response = ApiClient(main.app).post("/tatamis/1/result", json={"winner": "red"})
-    assert response.status_code == 501
-    assert "disabled" in response.json()["detail"].lower()
+    assert response.status_code in (422, 503), response.status_code
+    assert "written" not in response.text
 
 
 def test_13_bracket_failure_never_touches_scoreboard(monkeypatch):

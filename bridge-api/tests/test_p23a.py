@@ -191,11 +191,12 @@ def test_assign_rejects_path_tatami_without_transport(monkeypatch):
 
 @pytest.mark.parametrize("payload", [None, {}, {"tatami": 1, "match_id": 40, "winner": "red"}])
 def test_result_is_explicitly_disabled_without_writes(monkeypatch, payload):
+    """P2.4D: sin credenciales de escritura no hay escritura, ni transporte, ni 501."""
     from app import main
     monkeypatch.setattr(bc.httpx, "AsyncClient", lambda **kw: pytest.fail("No transport"))
     response = ApiClient(main.app).post("/tatamis/1/result", json=payload)
-    assert response.status_code == 501
-    assert "disabled" in response.json()["detail"].lower()
+    assert response.status_code in (422, 503), response.status_code
+    assert "written" not in response.text
 
 
 @pytest.mark.parametrize("scenario,expected", [("timeout", 504), ("connect", 502),

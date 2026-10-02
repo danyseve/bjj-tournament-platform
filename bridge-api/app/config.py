@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -11,6 +12,20 @@ class Settings(BaseSettings):
     scoreboard_tatami_6_url: str = "http://scoreboard-tatami-6:3000"
     scoreboard_internal_token: str = ""
     scoreboard_timeout_seconds: float = 10.0
+
+    # P2.4D — credenciales SEPARADAS de escritura en Bracket. No se reutiliza
+    # ningun token del navegador ni el secreto interno del scoreboard, y no hay
+    # valores por defecto: sin ambas variables no se publica nada.
+    bracket_write_username: str = ""
+    bracket_write_password: SecretStr = SecretStr("")
+    bracket_write_timeout_seconds: float = 10.0
+
+    @property
+    def bracket_write_configured(self) -> bool:
+        """True only when both write credentials are present."""
+        return bool(self.bracket_write_username) and bool(
+            self.bracket_write_password.get_secret_value()
+        )
 
     class Config:
         env_file = ".env"

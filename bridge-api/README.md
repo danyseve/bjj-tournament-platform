@@ -1,11 +1,18 @@
-# BJJ Bridge API — P2.3A / P2.4A
+# BJJ Bridge API — P2.3A / P2.4A / P2.4D
 
 Capa de lectura y normalización entre Bracket y BJJ-Scoreboard. Desde P2.3D
 entrega además la asignación normalizada al scoreboard integrado del **Tatami 1**
 por HTTP. Desde P2.4A puede además **listar los combates candidatos** de un torneo
 (`GET /tatamis/1/candidates`), pero **elegir y asignar sigue siendo un acto
 explícito del operador**: no existe autoavance ni asignación silenciosa.
-**Sigue sin escribir resultados en Bracket**, al que solo hace `GET`.
+
+Desde P2.4D puede **publicar en Bracket un resultado cerrado**, pero solo el único
+que es representable sin falsear datos: **victoria natural por puntos**. Todo lo
+demás se bloquea con `pending_manual`/`conflict` y no se escribe. La escritura va
+por credenciales propias del Bridge (nunca las del navegador), con lectura previa,
+CAS lógico y verificación posterior. **Implementado, no desplegado**: mientras
+producción no ejecute un Bracket >= `47bc129`, la escritura no puede habilitarse
+(ver *Publicación de resultados*).
 
 ## Configuración de la URL
 
@@ -193,22 +200,91 @@ viviendo en memoria del scoreboard en el despliegue actual. La persistencia exis
 desde P2.4B pero es **opt-in** (`SCOREBOARD_STATE_FILE`, ver
 `scoreboard-adapter/README.md`) y **no** está activada en el Compose desplegado.
 
-### Resultados deshabilitados
+## Resultado del combate (P2.4D)
 
-`POST /tatamis/{tatami_id}/result` devuelve explícitamente **HTTP 501**, incluso
-sin body o con el body legado. No invoca ningún transporte ni realiza escrituras.
+`POST /tatamis/{tatami_id}/result` publica en Bracket el resultado **cerrado** del
+combate que el cliente identifica. Solo el Tatami 1: cualquier otro se rechaza con
+400. El body identifica el combate, **no** lleva puntos ni ganador:
+
+```json
+{"tournament_id": 1, "match_id": 9001, "session_id": "…", "expected_revision": 4}
+```
+
+`expected_revision` es opcional. El Bridge lee el estado vivo del scoreboard, aplica
+la puerta de resultado seguro, relee el combate en Bracket, y solo entonces escribe.
+Respuestas:
+
+- `200` con `status: "written"` (y `idempotent: true` si era un reintento del mismo
+  resultado) — escrito y verificado.
+- `200` con `status: "pending_manual"` — representable sin falsear datos no: no se
+  escribió nada. `reason` indica por qué (`unsupported_result_mapping`,
+  `tie_not_writable`, `not_finished`, `no_state`, …).
+- `409` con `status: "conflict"` — otro operador cambió el combate, o ya hay otro
+  resultado publicado, o la identidad no coincide. **No** se sobrescribe.
+- `502` con `status: "failed"` — la escritura no se pudo verificar después; no se
+  reintenta automáticamente.
+- `400` tatami ≠ 1 · `503` sin credenciales de escritura configuradas · `401/403/404`
+  propagados de Bracket (traducidos a error del Bridge cuando son de credencial).
+
+## Publicación de resultados (P2.4D)
+
+Implementación del **único** caso automático del ADR-001 (sección 14): victoria
+natural por puntos. Archivos: `app/result_gate.py` (puerta),
+`app/fingerprint.py` (huella), `app/result_store.py` (seguimiento en memoria),
+`app/bracket_client.py` (`login`, `read_match`, `update_match`, `match_baseline`,
+`match_write_body`, `post_verify`) y `app/main.py` (endpoint).
+
+Puerta de resultado seguro — escribe **solo** si se cumple todo: hay estado, el
+combate pertenece al torneo, `status == "finished"`, `winner_team_id` es uno de los
+dos luchadores, `method == "points"`, los puntos difieren y el ganador es
+naturalmente el lado con más puntos. Nunca se escriben `advantages`, `penalties`,
+`method` ni un ganador artificial: el body del `PUT` son los seis campos de
+`MatchBody` con los **puntos reales**.
+
+`result_fingerprint` = `sha256("v1|tournament_id|match_id|session_id|revision|
+winner_team_id|method|points_a|points_b|advantages_a|advantages_b|penalties_a|
+penalties_b")`: determinista, sin tokens, sin secretos y sin nombres. Mismo
+resultado ⇒ misma huella; cualquier cambio ⇒ huella distinta (y por tanto
+`conflict`, nunca sobrescritura silenciosa).
+
+Antes del `PUT` se relee el combate (`GET /stages`, `no_draft_rounds`) y se
+preservan `round_id`, `court_id`, `custom_duration_minutes` y
+`custom_margin_minutes`; se comprueba que los participantes siguen siendo los del
+combate. Como Bracket no ofrece `ETag`/`If-Match`, el CAS es **lógico**: se compara
+contra la línea base del intento anterior del mismo combate. Después del `PUT` se
+vuelve a leer y se verifica marcador, ganador derivado y campos preservados: **un
+200 no basta**.
+
+Limitaciones declaradas (no se finge durabilidad):
+
+- El seguimiento de intentos vive en **memoria del proceso** del Bridge: no es
+  durable, no coordina réplicas y no sustituye al estado del scoreboard.
+- Ventana de carrera entre la relectura y el `PUT`: otro escritor podría colarse
+  (Bracket no es transaccional, DEF-03). La verificación posterior lo detecta, pero
+  no puede revertirlo.
+- La primera publicación **exige un combate sin marcador previo**; si ya hay
+  puntuación ajena, responde `conflict` (`bracket_match_not_pristine`).
+
+Credenciales: `BRACKET_WRITE_USERNAME` y `BRACKET_WRITE_PASSWORD` (separadas de las
+del navegador). El Bridge canjea un JWT con `POST /token` y lo usa como `Bearer`
+durante la escritura; **el token no se registra ni se devuelve**. Sin credenciales
+el endpoint responde 503 y no intenta escribir. Las pruebas usan secretos
+sintéticos.
 
 ## Traducción de resultados a Bracket (P2.4C)
 
-Diseño, no implementación: **no existe ningún `PUT` de resultados** y el endpoint
-sigue en 501. La política está documentada y justificada con el código real de
-Bracket en `docs/adr/ADR-001-politica-traduccion-resultados-bjj.md`.
+Política documentada y justificada con el código real de Bracket en
+`docs/adr/ADR-001-politica-traduccion-resultados-bjj.md`. El diseño preveía cuatro
+opciones (A: escribir solo si el ganador declarado coincide con el lado de más
+puntos; B: ampliar Bracket con ganador/método/ventajas/penalizaciones; C: scores
+genéricos con metadata externa; D: score artificial, descartada). **P2.4D implementa
+solo la opción A** (ver arriba); B, C y D siguen sin implementarse.
 
-Nota de P2.4C.1 (hardening previo, sin escritura): en el submódulo Bracket
-(`47bc129`, publicado en el fork propio) quedan corregidos **DEF-01** (alcance por
-torneo en las dependencias de recurso) y **DEF-02** (`None` legítimos en el
-`UPDATE`). **DEF-03** (PUT no transaccional) sigue pendiente. La imagen en
-producción todavía no incluye el arreglo y este Bridge **no** escribe resultados.
+Nota de P2.4C.1 (hardening previo): en el submódulo Bracket (`47bc129`, publicado en
+el fork propio) quedan corregidos **DEF-01** (alcance por torneo en las dependencias
+de recurso) y **DEF-02** (`None` legítimos en el `UPDATE`). **DEF-03** (PUT no
+transaccional) sigue pendiente. La imagen en producción todavía no incluye el
+arreglo, así que la escritura de P2.4D **no puede habilitarse** allí.
 
 Resumen operativo:
 
@@ -221,18 +297,19 @@ Resumen operativo:
   empate con ventaja/penalización decisiva y `other` quedan en
   `pending_manual` y **no se escriben**. El caso de DQ es además peligroso:
   escribir los puntos reales declararía ganador al rival.
-- Un futuro `PUT` debe reenviar `round_id`, `court_id`,
-  `custom_duration_minutes` y `custom_margin_minutes` leídos del match actual:
-  el body es un reemplazo completo y esos campos no admiten `null` (provoca 500).
-  Un match sin pista asignada no se puede actualizar por esta vía.
-- Idempotencia prevista: un `result_fingerprint` derivado de
-  `session_id`/`revision`/ganador/método/puntos con estado
-  `none | pending_manual | written | failed | conflict`, y lectura previa del
+- El `PUT` reenvía `round_id`, `court_id`, `custom_duration_minutes` y
+  `custom_margin_minutes` leídos del match actual: el body es un reemplazo completo.
+  Con la imagen >= `47bc129` los `null` legítimos ya no rompen el `UPDATE` (DEF-02);
+  con la imagen en producción (basada en `e6abd7d`) provocarían un `StatementError`.
+- Idempotencia implementada en P2.4D: `result_fingerprint` derivado de
+  `session_id`/`revision`/ganador/método/puntos/ventajas/penalizaciones, con estados
+  `pending_manual | writing | written | failed | conflict`, y lectura previa del
   match para detectar cambios de otro operador antes de escribir.
-- Antes de habilitar cualquier escritura hay que resolver dos defectos del
-  Bracket actual: el filtro de torneo que se pierde en las dependencias por un
-  `and` de Python (`routes/util.py:24,67,84`) y el `StatementError` cuando
-  `court_id`/`custom_*` son `null`.
+- Los dos defectos del Bracket que bloqueaban la escritura están corregidos en
+  `47bc129` (filtro de torneo que se perdía en las dependencias por un `and` de
+  Python en `routes/util.py`, y el `StatementError` con `court_id`/`custom_*` a
+  `null`), pero **no desplegados**: mientras producción no ejecute ese Bracket, la
+  escritura automática no se habilita.
 
 ## Pruebas aisladas
 
@@ -245,3 +322,17 @@ PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider
 
 La suite utiliza `httpx.MockTransport` para Bracket y `httpx.ASGITransport` para
 la API en memoria. No necesita producción, servicios, contenedores ni builds.
+`tests/test_p24d.py` añade 70 casos de la publicación de resultados: victoria A y B
+por puntos, empate (con y sin ventajas), submission/decision/DQ/walkover/referee
+stoppage/other, ganador que contradice los puntos, identidad equivocada, CAS con
+marcador cambiado, idempotencia, verificación posterior, 401/403/404/timeout/5xx,
+token fuera de los logs y de las respuestas, tatami ≠ 1, scoreboard inalcanzable y
+una comprobación explícita de que **ningún transporte real se construye** durante
+las pruebas (huella de que producción no se contacta).
+
+El E2E de P2.4D se ejecutó aparte, fuera de la suite, contra una imagen de Bracket
+construida **desde `47bc129`** (`bjj-bracket:p2.4d-test`), con PostgreSQL temporal,
+red temporal y el scoreboard integrado en modo local: victoria 6–2 publicada y
+verificada, reintento idempotente sin segundo `PUT`, submission/empate bloqueados,
+marcador ajeno no sobrescrito, `PUT` a un combate de otro torneo con 404 y `null` en
+`court_id`/`custom_*` aceptados. Nada de eso tocó producción.

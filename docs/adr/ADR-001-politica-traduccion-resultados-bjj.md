@@ -3,7 +3,8 @@
 - Estado: **propuesta** (recomendación técnica; la elección final tiene un punto de
   decisión de producto que se marca en la sección 13)
 - Fecha: 2026-10-02
-- Fase: **P2.4C** (diseño). No implementa ninguna escritura.
+- Fase: **P2.4C** (diseño) → **P2.4D** (implementación del único caso automático,
+  sin desplegar).
 - Base: repo principal `1d981673b5eccc1c7eac82ba0f3198bdfec4480f`; submódulo
   `services/bracket` en `e6abd7d282850f9d13d9122494767d4dbcb139ef`.
 - Alcance: documentación de diseño. No se escribe en Bracket, no se toca PostgreSQL,
@@ -13,6 +14,11 @@
   propio. DEF-03 y DEF-04 siguen abiertos. La corrección **no está desplegada**:
   la imagen en producción sigue construida sobre `e6abd7d`. Sigue **sin existir**
   escritura desde el Bridge.
+- Actualización **P2.4D** (2026-10-02): **implementado** el primer flujo de escritura
+  Bridge → Bracket, limitado al **caso A** (victoria natural por puntos). Gate,
+  fingerprint, CAS lógico, verificación posterior, idempotencia y pruebas están en
+  la sección 14. **No desplegado**: producción sigue ejecutando la imagen basada en
+  `e6abd7d` y el Bridge nuevo no está publicado.
 
 ## 1. Contexto
 
@@ -21,8 +27,9 @@ sobrevivir a un reinicio (P2.4B). Bracket es la fuente de verdad del torneo:
 calendario, árbol de rondas y clasificaciones. Falta decidir **si** y **cómo** un
 resultado BJJ puede llegar a Bracket sin falsear datos.
 
-El endpoint de escritura del Bridge sigue deshabilitado por diseño:
-`bridge-api/app/main.py:108` devuelve **501** en `POST /tatamis/{id}/result`.
+El endpoint de escritura del Bridge ya no está deshabilitado: desde P2.4D,
+`POST /tatamis/{id}/result` publica **únicamente** el caso A (sección 14) y responde
+`pending_manual` o `conflict`, sin escribir, para todo lo demás.
 
 ## 2. Modelo real de Bracket (evidencia en código)
 
@@ -240,9 +247,10 @@ Campos extra en el body **no** rompen la petición (pydantic los ignora:
   (`routes/stages.py:41-51`), que es lo que usa hoy el Bridge
   (`bridge-api/app/bracket_client.py:16-39`, sin cabecera de autorización).
 
-## 9. Idempotencia futura (diseño, no implementado)
+## 9. Idempotencia (diseñada aquí; implementada en P2.4D, sección 14)
 
-Clave interna propuesta, derivada del estado ya persistido en P2.4B:
+Clave interna implementada en P2.4D, idéntica a la propuesta, derivada del estado
+ya persistido en P2.4B:
 
 ```
 result_fingerprint = sha256(
@@ -264,7 +272,7 @@ Se guarda un registro de mapeo por `match_id` con estados
   (compare-and-swap lógico, porque Bracket no ofrece `ETag`/`If-Match`).
   Si no coinciden ⇒ `conflict`, sin escribir.
 
-## 10. Errores y rollback futuros (diseño, no implementado)
+## 10. Errores y rollback (diseñados aquí; implementados en P2.4D, sección 14)
 
 Principio: **un fallo upstream nunca se convierte en éxito local**. El scoreboard
 conserva su estado `finished`; lo que cambia es el estado del mapeo.
@@ -341,10 +349,11 @@ los scores antiguos): un PUT a ciegas puede pisar el trabajo de otro operador.
 
 1. **Automatizar solo el caso A** (victoria por puntos con `s1 != s2` y
    `winner_team_id` igual al lado con más puntos), con relectura previa
-   (compare-and-swap) y verificación posterior del marcador.
+   (compare-and-swap) y verificación posterior del marcador. **HECHO en P2.4D**
+   (sección 14), sin desplegar.
 2. **Bloquear explícitamente** B, C, D, E, F, G, H e I: el Bridge debe responder
    `pending_manual` con motivo, y **no** escribir nada. Con especial énfasis en F
-   (riesgo de invertir el ganador).
+   (riesgo de invertir el ganador). **HECHO en P2.4D** (sección 14).
 3. **Ampliar Bracket solo si el producto lo exige** (opción B, fork del submódulo):
    es la única vía para representar método, ventajas, penalizaciones y ganador
    explícito con fidelidad. Antes de eso, la metadata BJJ vive fuera de Bracket
@@ -376,5 +385,97 @@ Hasta que esas dos preguntas tengan respuesta, la política por defecto es la m�
 conservadora: **solo caso A automático, el resto manual y bloqueado**.
 
 Estado tras P2.4C.1: el gate de hardening queda cerrado (DEF-01 y DEF-02
-corregidos y publicados), pero **P2.4D sigue sin implementarse** y la escritura
-desde el Bridge continúa deshabilitada (**501**).
+corregidos y publicados).
+
+Estado tras P2.4D: **implementado** el flujo del caso A —publicación automática de
+una victoria natural por puntos, con gate de resultado seguro, fingerprint
+versionado, relectura previa con compare-and-swap lógico, verificación posterior e
+idempotencia— y **sigue sin desplegarse**: la imagen de Bracket en producción es la
+construida sobre `e6abd7d` (sin DEF-01/DEF-02), el Bridge nuevo no está publicado y
+no se ha escrito nada contra el Bracket productivo. Mientras producción no ejecute
+un Bracket >= `47bc129`, la escritura no puede habilitarse.
+
+## 14. Implementación P2.4D (caso A, sin desplegar)
+
+Alcance: solo `bridge-api` (repo principal). No se toca el submódulo Bracket, ni
+Compose, ni `.env`, ni nginx, ni WireGuard, ni el scoreboard, ni el modelo BJJ.
+
+### 14.1 Automático vs manual
+
+| Resultado BJJ | Decisión | Motivo devuelto |
+|---|---|---|
+| Victoria por puntos, `points_a != points_b`, ganador = lado con más puntos | **escribe** | — |
+| Empate en puntos (con o sin ventajas) | `pending_manual` | `tie_not_writable` |
+| `method` distinto de `points` | `pending_manual` | `unsupported_result_mapping` |
+| Ganador declarado que contradice los puntos | `conflict` | `winner_contradicts_points` |
+| `winner_team_id` que no es uno de los dos participantes | `conflict` | `invalid_winner` |
+| Scoreboard no `finished` | `pending_manual` | `not_finished` |
+| Sin estado de scoreboard | `pending_manual` | `no_state` |
+| Identidad distinta de la esperada | `conflict` | `tournament_mismatch` / `match_mismatch` / `session_mismatch` / `revision_mismatch` |
+| Bracket ya tiene marcador ajeno en el combate | `conflict` | `bracket_match_not_pristine` |
+| Bracket cambió desde el intento anterior | `conflict` | `bracket_scores_changed` |
+| Ese combate ya tiene otro resultado publicado | `conflict` | `already_written_different_result` |
+| Participantes de Bracket ≠ luchadores del combate | `conflict` | `participants_mismatch` |
+| Scoreboard ilegible / estado inválido | `failed` | `invalid_scoreboard_state` |
+| Verificación posterior con diferencias | `failed` | `post_verify_*` |
+
+Nunca se escriben `advantages`, `penalties`, `method` ni un `winner` artificial: el
+body del PUT son los seis campos de `MatchBody` y los scores son los puntos reales.
+
+### 14.2 Fingerprint
+
+`sha256("v1|tournament_id|match_id|session_id|revision|winner_team_id|method|points_a|points_b|advantages_a|advantages_b|penalties_a|penalties_b")`.
+Determinista, sin tokens, sin secretos y sin nombres: mismo resultado ⇒ mismo
+fingerprint; cualquier cambio ⇒ fingerprint distinto.
+
+### 14.3 Lectura previa y CAS lógico
+
+Antes del PUT se relee el combate desde Bracket (vía `GET /stages`, `no_draft_rounds`)
+y se conservan `round_id`, `court_id`, `custom_duration_minutes`,
+`custom_margin_minutes` y los participantes. Bracket **no** ofrece `ETag`/`If-Match`,
+así que el CAS es lógico: se compara el marcador contra la línea base registrada en
+el intento anterior del mismo combate. Ventana de carrera residual: entre la
+relectura y el PUT otro escritor podría cambiar el marcador; el PUT lo sobrescribiría
+sin detectarlo (Bracket no es transaccional — DEF-03). La verificación posterior sí
+detectaría un resultado distinto al esperado.
+
+### 14.4 Verificación posterior
+
+Un HTTP 200 no basta: tras el PUT se vuelve a leer y se comprueba marcador,
+ganador derivado, `round_id`, `court_id` y duraciones/márgenes. Si algo no cuadra se
+devuelve `failed` con motivo `post_verify_*` y **no** se reintenta el PUT.
+
+### 14.5 Idempotencia
+
+Mismo fingerprint ya `written` ⇒ se devuelve éxito idempotente (`idempotent: true`) y
+**no** hay segundo PUT. Mismo combate con fingerprint distinto ⇒ `conflict`
+(`already_written_different_result`): nunca se sobrescribe un resultado anterior de
+forma automática, ni siquiera desde una sesión nueva.
+
+### 14.6 Estado de publicación
+
+El seguimiento (`pending_manual`, `writing`, `written`, `failed`, `conflict`) vive en
+**memoria del proceso** del Bridge: es deliberado y está documentado en
+`bridge-api/README.md`. No sustituye al estado vivo del scoreboard, no es durable y
+no coordina dos réplicas.
+
+### 14.7 DEF-03
+
+Sigue sin arreglarse (fuera de alcance de P2.4D). Riesgo: el UPDATE de Bracket puede
+aplicarse en parte; la verificación posterior lo detecta pero no puede revertirlo de
+forma segura, así que se marca `failed` y no se hace un segundo PUT automático.
+
+### 14.8 Pruebas
+
+70 casos en `bridge-api/tests/test_p24d.py` (victoria A/B, empates, métodos no
+soportados, contradicción de ganador, identidad equivocada, CAS, idempotencia,
+verificación posterior, 401/403/404/timeout/5xx, token fuera de logs y respuestas,
+tatami ≠ 1, scoreboard inalcanzable y "nunca se contacta producción"), más un E2E
+aislado contra una imagen de Bracket **construida desde `47bc129`**, con PostgreSQL
+temporal, red temporal y el scoreboard integrado. Nada de eso toca producción.
+
+### 14.9 Habilitación
+
+La escritura automática requiere: (1) producción ejecutando un Bracket >= `47bc129`,
+(2) el Bridge desplegado con credenciales de escritura propias, y (3) la decisión de
+producto de la sección 13 resuelta. Ninguna de las tres se ha ejecutado aquí.
