@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BJJ Vetusta · Asturkon — Control del torneo</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🥋</text></svg>">
+</head>
+<body>
+<header class="cabecera">
+  <p class="marca">BJJ VETUSTA <span class="punto">·</span> ASTURKON</p>
+  <h1>Control del torneo</h1>
+  <p class="sub">Acceso a las mesas de tatami, al cuadro del torneo y a los manuales operativos.</p>
+</header>
+
+<main>
+  <h2 class="seccion">Tatamis</h2>
+  <div class="rejilla" id="tatamis">
+
+    <article class="tarjeta" data-tatami="1">
+      <div class="tarjeta-cab">
+        <h3>Tatami 1</h3>
+        <span class="estado" data-estado="disponible">Disponible</span>
+      </div>
+      <p class="detalle">Marcador y control del árbitro.</p>
+      <div class="acciones">
+        <a class="boton primario" href="https://tatami1.opsforge.cc">Abrir</a>
+        <a class="boton" href="https://docs.opsforge.cc/bjj/tatami/">Manual</a>
+      </div>
+    </article>
+
+    <article class="tarjeta inactiva" data-tatami="2">
+      <div class="tarjeta-cab">
+        <h3>Tatami 2</h3>
+        <span class="estado" data-estado="proximamente">Próximamente</span>
+      </div>
+      <p class="detalle">Aún no desplegado.</p>
+      <div class="acciones">
+        <span class="boton desactivado" aria-disabled="true">Abrir</span>
+        <span class="boton desactivado" aria-disabled="true">Manual</span>
+      </div>
+    </article>
+
+    <article class="tarjeta inactiva" data-tatami="3">
+      <div class="tarjeta-cab">
+        <h3>Tatami 3</h3>
+        <span class="estado" data-estado="proximamente">Próximamente</span>
+      </div>
+      <p class="detalle">Aún no desplegado.</p>
+      <div class="acciones">
+        <span class="boton desactivado" aria-disabled="true">Abrir</span>
+        <span class="boton desactivado" aria-disabled="true">Manual</span>
+      </div>
+    </article>
+
+    <article class="tarjeta inactiva" data-tatami="4">
+      <div class="tarjeta-cab">
+        <h3>Tatami 4</h3>
+        <span class="estado" data-estado="proximamente">Próximamente</span>
+      </div>
+      <p class="detalle">Aún no desplegado.</p>
+      <div class="acciones">
+        <span class="boton desactivado" aria-disabled="true">Abrir</span>
+        <span class="boton desactivado" aria-disabled="true">Manual</span>
+      </div>
+    </article>
+
+    <article class="tarjeta inactiva" data-tatami="5">
+      <div class="tarjeta-cab">
+        <h3>Tatami 5</h3>
+        <span class="estado" data-estado="proximamente">Próximamente</span>
+      </div>
+      <p class="detalle">Aún no desplegado.</p>
+      <div class="acciones">
+        <span class="boton desactivado" aria-disabled="true">Abrir</span>
+        <span class="boton desactivado" aria-disabled="true">Manual</span>
+      </div>
+    </article>
+
+    <article class="tarjeta inactiva" data-tatami="6">
+      <div class="tarjeta-cab">
+        <h3>Tatami 6</h3>
+        <span class="estado" data-estado="proximamente">Próximamente</span>
+      </div>
+      <p class="detalle">Aún no desplegado.</p>
+      <div class="acciones">
+        <span class="boton desactivado" aria-disabled="true">Abrir</span>
+        <span class="boton desactivado" aria-disabled="true">Manual</span>
+      </div>
+    </article>
+
+  </div>
+
+  <h2 class="seccion">Torneo</h2>
+  <div class="rejilla">
+    <article class="tarjeta" data-app="bracket">
+      <div class="tarjeta-cab">
+        <h3>BJJ Tournament / Bracket</h3>
+        <span class="estado" data-estado="disponible">Disponible</span>
+      </div>
+      <p class="detalle">Cuadro, categorías, competidores y asignación de tatamis.</p>
+      <div class="acciones">
+        <a class="boton primario" href="https://bracket.opsforge.cc">Abrir</a>
+        <a class="boton" href="https://docs.opsforge.cc/bjj/bracket/">Manual</a>
+      </div>
+    </article>
+  </div>
+
+  <h2 class="seccion">Proyecto</h2>
+  <div class="rejilla">
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><h3>Repositorio</h3></div>
+      <p class="detalle">Código y seguimiento del torneo (repositorio privado).</p>
+      <div class="acciones">
+        <a class="boton" href="https://github.com/danyseve/bjj-tournament-platform">GitHub</a>
+        <a class="boton" href="https://docs.opsforge.cc/">Documentación</a>
+      </div>
+    </article>
+  </div>
+</main>
+
+<footer class="pie">
+  <p>Acceso restringido al equipo del torneo. Cada aplicación se sirve en su propio hostname.</p>
+  <p class="opsforge">Powered by <strong>OpsForge</strong></p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

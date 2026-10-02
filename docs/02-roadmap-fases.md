@@ -1,5 +1,17 @@
 # 02 - Roadmap por fases
 
+## Portal operativo BJJ Vetusta y Bracket en hostname propio — P2.6B (CLOSED ✅, 2026-10-02)
+
+Commit `feat(portal): publish BJJ Vetusta operations hub`. `bjjvetusta.opsforge.cc` deja de ser
+Bracket y pasa a ser el **portal estático** del equipo (Tatami 1–6, Bracket, manuales, GitHub);
+Bracket se publica en su **hostname propio** `bracket.opsforge.cc`. Migración sin corte (primero
+Access → DNS → ingress → nginx → validación de `bracket.`, después el cambio de `bjjvetusta`).
+Sin tocar `opsforge.cc`/landing, sin WRITE, sin tocar PostgreSQL ni WireGuard, cero puertos
+nuevos. Detalle: `docs/11-demo-externa-cloudflare.md` §21.
+
+Pendiente de esta línea: **P2.6C** — hardening de accesos (la app de `bjjvetusta` sigue con OTP
+abierto: cualquier email verificado entra) y mejoras de UX del portal.
+
 ## Centro de documentación OpsForge `docs.opsforge.cc` — P2.6A.3 (CLOSED ✅, 2026-10-02)
 
 Commit `feat(docs): publish BJJ documentation center`. Documentación operativa de BJJ

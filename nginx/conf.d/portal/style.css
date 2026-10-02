@@ -1,0 +1,184 @@
+/* Portal BJJ Vetusta · Asturkon — CSS propio, sin dependencias ni CDN.
+   Criterios: alto contraste, botones grandes, usable en portatil/tablet. */
+
+:root {
+  --fondo: #101418;
+  --panel: #1b2129;
+  --panel-borde: #303a46;
+  --texto: #f2f5f8;
+  --texto-suave: #aab6c2;
+  --acento: #2f7d32;
+  --acento-claro: #3f9d44;
+  --aviso: #6b7480;
+  --radio: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  padding: 0 16px 40px;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.45;
+}
+
+.cabecera {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 0 18px;
+  border-bottom: 2px solid var(--panel-borde);
+}
+
+.marca {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.punto { color: var(--acento-claro); }
+
+.cabecera h1 {
+  margin: 6px 0 4px;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+
+.sub {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--texto-suave);
+  font-size: 0.95rem;
+}
+
+main { max-width: 1080px; margin: 0 auto; }
+
+.seccion {
+  margin: 32px 0 12px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--texto-suave);
+  font-weight: 700;
+}
+
+.rejilla {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-borde);
+  border-radius: var(--radio);
+}
+
+.tarjeta.inactiva { opacity: 0.62; }
+
+.tarjeta-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tarjeta h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.estado {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--aviso);
+  color: #fff;
+}
+
+.estado[data-estado="disponible"] { background: var(--acento); }
+.estado[data-estado="proximamente"] { background: var(--aviso); }
+
+.detalle {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 0.92rem;
+  flex: 1 1 auto;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Botones grandes: area tactil comoda en tablet. */
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  min-width: 108px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-borde);
+  background: #232b35;
+  color: var(--texto);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: 0.03em;
+}
+
+.boton.primario {
+  background: var(--acento);
+  border-color: var(--acento-claro);
+}
+
+.boton:focus-visible {
+  outline: 3px solid #ffd54f;
+  outline-offset: 2px;
+}
+
+/* Sin animaciones: nada que distraiga en pleno combate. */
+@media (hover: hover) {
+  .boton.primario:hover { background: var(--acento-claro); }
+  .boton:not(.desactivado):hover { background: #2c3641; }
+}
+
+.boton.desactivado {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #1d232b;
+  color: var(--texto-suave);
+}
+
+.pie {
+  max-width: 1080px;
+  margin: 40px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-borde);
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.pie p { margin: 4px 0; }
+
+.opsforge { letter-spacing: 0.04em; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

@@ -49,16 +49,23 @@ tatami.
 
 ## Enlaces
 
+- Portal del torneo: `https://bjjvetusta.opsforge.cc` (Tatami 1–6, Bracket, manuales, GitHub)
 - Tatami 1: `https://tatami1.opsforge.cc` (viewer) y `https://tatami1.opsforge.cc/control` (mesa)
-- Bracket: `https://bjjvetusta.opsforge.cc`
+- Bracket: `https://bracket.opsforge.cc`
 - Repositorio: `https://github.com/danyseve/bjj-tournament-platform` (privado)
 
-## Pendiente de integración (P2.6B)
+## Portal del torneo (P2.6B, 2026-10-02)
 
-- El **portal BJJ** (`bjjvetusta.opsforge.cc`) enlazará a cada manual y a su PDF desde sus
-  botones de Tatami 1–6, Bracket y Manuales. Hoy el acceso es directo por URL.
-- La pantalla de `/control` del tatami llevará un enlace `? Manual` a
-  `/bjj/tatami/`, como cambio atómico propio (no se ha tocado la UI del marcador).
+El **portal BJJ Vetusta / Asturkon** vive en `bjjvetusta.opsforge.cc` y es la puerta de entrada
+del equipo: tarjetas de Tatami 1–6 (Tatami 2–6 marcados PRÓXIMAMENTE, sin botón activo),
+Bracket (`bracket.opsforge.cc`) y el repositorio. Cada tarjeta enlaza también a su manual y a
+su PDF en este centro. El portal sirve estado **estático**: no consulta APIs internas.
+
+Pendientes (mini-tareas atómicas, no bloquean el cierre):
+
+- La pantalla de `/control` del tatami llevará un enlace `? Manual` a `/bjj/tatami/` (implica
+  reconstruir la imagen del marcador; no se ha tocado su UI).
+- Capturas reales (hoy solo esquemas anotados; ver `CAPTURAS.md`).
 
 *Este centro de documentación se mantiene desde el repositorio
 (`docs-site/`, una sola fuente Markdown para HTML y PDF).*

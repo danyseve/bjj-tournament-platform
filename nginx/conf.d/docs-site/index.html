@@ -92,21 +92,26 @@ del operador) se marcan de forma explícita en cada documento.</p>
 tatami.</p>
 <h2 id="enlaces">Enlaces</h2>
 <ul>
+<li>Portal del torneo: <code>https://bjjvetusta.opsforge.cc</code> (Tatami 1–6, Bracket, manuales, GitHub)</li>
 <li>Tatami 1: <code>https://tatami1.opsforge.cc</code> (viewer) y <code>https://tatami1.opsforge.cc/control</code> (mesa)</li>
-<li>Bracket: <code>https://bjjvetusta.opsforge.cc</code></li>
+<li>Bracket: <code>https://bracket.opsforge.cc</code></li>
 <li>Repositorio: <code>https://github.com/danyseve/bjj-tournament-platform</code> (privado)</li>
 </ul>
-<h2 id="pendiente-de-integracion-p26b">Pendiente de integración (P2.6B)</h2>
+<h2 id="portal-del-torneo-p26b-2026-10-02">Portal del torneo (P2.6B, 2026-10-02)</h2>
+<p>El <strong>portal BJJ Vetusta / Asturkon</strong> vive en <code>bjjvetusta.opsforge.cc</code> y es la puerta de entrada
+del equipo: tarjetas de Tatami 1–6 (Tatami 2–6 marcados PRÓXIMAMENTE, sin botón activo),
+Bracket (<code>bracket.opsforge.cc</code>) y el repositorio. Cada tarjeta enlaza también a su manual y a
+su PDF en este centro. El portal sirve estado <strong>estático</strong>: no consulta APIs internas.</p>
+<p>Pendientes (mini-tareas atómicas, no bloquean el cierre):</p>
 <ul>
-<li>El <strong>portal BJJ</strong> (<code>bjjvetusta.opsforge.cc</code>) enlazará a cada manual y a su PDF desde sus
-  botones de Tatami 1–6, Bracket y Manuales. Hoy el acceso es directo por URL.</li>
-<li>La pantalla de <code>/control</code> del tatami llevará un enlace <code>? Manual</code> a
-  <code>/bjj/tatami/</code>, como cambio atómico propio (no se ha tocado la UI del marcador).</li>
+<li>La pantalla de <code>/control</code> del tatami llevará un enlace <code>? Manual</code> a <code>/bjj/tatami/</code> (implica
+  reconstruir la imagen del marcador; no se ha tocado su UI).</li>
+<li>Capturas reales (hoy solo esquemas anotados; ver <code>CAPTURAS.md</code>).</li>
 </ul>
 <p><em>Este centro de documentación se mantiene desde el repositorio
 (<code>docs-site/</code>, una sola fuente Markdown para HTML y PDF).</em></p>
     <p class="footer">Generado desde <code>index.md</code>
-    (sha256 c6b0cee8c0d7) por <code>docs-site/build.py</code>.</p>
+    (sha256 7a54e03741bf) por <code>docs-site/build.py</code>.</p>
   </main>
 </div>
 </body>

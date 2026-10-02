@@ -497,3 +497,49 @@ La documentación operativa prometida en §19 ya está online:
   atómica), `WRITE=false` intacto, cero puertos nuevos y `bjjvetusta`/`tatami1` sin regresión.
 
 Detalle técnico y operativo: `docs/14-documentation-center.md`.
+
+## 21. P2.6B — Portal operativo y Bracket en hostname propio (CLOSED ✅, 2026-10-02)
+
+Arquitectura final de publicación (**un hostname por aplicación publicable**):
+
+| Hostname | Qué sirve | App de Access | Sesión |
+|---|---|---|---|
+| `bjjvetusta.opsforge.cc` | Portal estático BJJ Vetusta / Asturkon | `BJJ Vetusta Manager` (OTP abierto — **DEUDA**) | 24 h |
+| `bracket.opsforge.cc` | Aplicación Bracket (`bracket:8400`) | `OpsForge BJJ Bracket` (allow-list explícita) | 24 h |
+| `tatami1.opsforge.cc` | Scoreboard Tatami 1 y `/control` | `OpsForge Tatami 1` (allow-list) | 8 h |
+| `docs.opsforge.cc` | Centro de documentación | `OpsForge Documentation` (allow-list) | 168 h |
+| `tatami2..6.opsforge.cc` | **no desplegados** (el portal los muestra PRÓXIMAMENTE) | — | — |
+
+`opsforge.cc` (landing) no se tocó, y no se usa `bjjvetusta.opsforge.cc/<app>` como acceso final.
+
+**Migración sin corte** (orden aplicado, no invertido): Access → DNS → ingress → nginx →
+validación externa de `bracket.opsforge.cc`, y **solo después** `bjjvetusta` pasó a servir el
+portal. Bracket no dejó de estar accesible en ningún momento.
+
+Cambios:
+- `nginx/conf.d/bracket.conf` (**nuevo**): `server_name bracket.opsforge.cc` → `bracket:8400`,
+  conservando `location /api/`. La SPA sirve rutas absolutas: este server es la raíz del hostname.
+- `nginx/conf.d/bjj.conf` (**reescrito**): sirve estático desde `/etc/nginx/conf.d/portal` con CSP
+  estricta (`default-src 'self'`, sin CDN). **Ya no hace proxy a Bracket.** Sigue siendo el
+  primer server de `conf.d`, o sea el *default* implícito: un Host desconocido recibe el portal
+  (página sin datos) y **nunca** la aplicación del torneo.
+- `nginx/conf.d/portal/` (**nuevo**): `index.html`, `style.css`, `app.js`, `status.json`.
+  HTML/CSS/JS propios, sin frameworks ni CDN; estado **estático** (el portal no consulta APIs
+  internas ni publica `/internal/*`). Botones grandes, alto contraste, responsive.
+- DNS/ingress: CNAME `bracket` (proxied) + 5.ª regla de ingress
+  `bracket.opsforge.cc → http://127.0.0.1:8080`; `bjjvetusta`, `tatami1`, `docs` y el catch-all
+  intactos; `warp-routing` intacto (hash del config `1f3834e11883c0a3`).
+- Access: app nueva `OpsForge BJJ Bracket` = `ee15f8b8-7f32-402b-b5e0-1c9d24cc7d0e`, **1 identidad
+  copiada** de Tatami 1, OTP, 24 h, deny by default. No se usó como modelo la policy abierta de BJJ.
+
+**SSO: no existe entre apps.** La organización de Access no tiene sesión global configurada, de
+modo que cada aplicación mantiene su propia sesión: el equipo introduce el OTP **una vez por
+app** y caduca según su `session_duration`. No se promete SSO.
+
+**Deuda registrada** (hardening, para P2.6C): la app de `bjjvetusta` sigue aceptando **cualquier
+email verificado por OTP** (0 identidades explícitas). No se ha tocado en P2.6B.
+
+**Rollback**: restaurar `bjj.conf` desde `.../portal-<ts>/bjj.conf.original` (sha `7e9ccbe2`,
+idéntico a `git show HEAD:nginx/conf.d/bjj.conf` previo) y `docker exec bjj-nginx nginx -s reload`
+(sin recrear el contenedor). `bracket.opsforge.cc` **no se elimina**: el rollback devuelve Bracket
+a `bjjvetusta` sin perder el hostname nuevo.

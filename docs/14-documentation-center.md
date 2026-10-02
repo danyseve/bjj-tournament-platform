@@ -149,8 +149,24 @@ queda intacta; se documenta como pendiente de decisión del club, no como cambio
    hoy solo hay esquemas anotados.
 3. **Manual Bracket y del Organizador**: publicados como esqueleto; falta el contenido
    detallado y el `Login exacto` de Bracket.
-4. **Enlaces desde el portal BJJ** (`bjjvetusta.opsforge.cc`): se añadirán en P2.6B junto con
-   los botones de Tatami 1–6.
+4. **Enlaces desde el portal BJJ** (`bjjvetusta.opsforge.cc`): **HECHO en P2.6B** — el portal
+   enlaza a cada manual y a su PDF (botón `MANUAL`), y a la portada del centro. Ver
+   `docs/11-demo-externa-cloudflare.md` §21.
+
+## Relación con el portal BJJ (P2.6B, 2026-10-02)
+
+El portal operativo vive en `bjjvetusta.opsforge.cc` (`nginx/conf.d/portal/`, estático) y es
+la puerta de entrada del equipo durante el torneo:
+
+- `Tatami 1` → `ABRIR` a `https://tatami1.opsforge.cc` y `MANUAL` a `/bjj/tatami/` de este
+  centro (el PDF del manual se descarga desde la portada y desde `/bjj/tatami/`).
+- `Bracket` → `ABRIR` a `https://bracket.opsforge.cc` (aplicación en su propio hostname desde
+  P2.6B) y `MANUAL` a `/bjj/bracket/`.
+- `Tatami 2–6` aparecen como **PRÓXIMAMENTE** y sin botones activos.
+- `Repositorio` → GitHub del proyecto; más un enlace a la portada de este centro.
+
+El portal no consume ninguna API interna: su estado es estático (`portal/status.json`). Por
+tanto este centro de documentación sigue siendo **estático y desacoplado** de las apps.
 
 ## Versionado mostrado en cada manual
 

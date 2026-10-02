@@ -24,7 +24,7 @@ pdf: manual-bracket-v0.1.pdf
 | **Fecha** | 2026-10-02 |
 | **Proyecto** | OpsForge · BJJ Vetusta / Asturkon |
 | **Estado** | Draft |
-| **Alcance** | Bracket de BJJ Vetusta (`bjjvetusta.opsforge.cc`) |
+| **Alcance** | Bracket de BJJ Vetusta (`bracket.opsforge.cc`) |
 
 ## 0. Qué es Bracket y qué no
 

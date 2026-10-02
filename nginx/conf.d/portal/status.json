@@ -1,0 +1,16 @@
+{
+  "proyecto": "BJJ Vetusta · Asturkon",
+  "actualizado": "2026-10-02",
+  "nota": "Estado declarado a mano. No es estado en vivo del torneo: el portal no consulta ninguna API interna.",
+  "tatamis": {
+    "1": { "estado": "disponible", "url": "https://tatami1.opsforge.cc", "manual": "https://docs.opsforge.cc/bjj/tatami/" },
+    "2": { "estado": "proximamente" },
+    "3": { "estado": "proximamente" },
+    "4": { "estado": "proximamente" },
+    "5": { "estado": "proximamente" },
+    "6": { "estado": "proximamente" }
+  },
+  "apps": {
+    "bracket": { "estado": "disponible", "url": "https://bracket.opsforge.cc", "manual": "https://docs.opsforge.cc/bjj/bracket/" }
+  }
+}
