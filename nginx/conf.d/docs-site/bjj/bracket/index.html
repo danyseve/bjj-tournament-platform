@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de Bracket (estructura) - Centro de documentacion OpsForge</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Centro de documentacion OpsForge</a>
+    <span class="sub">BJJ Vetusta / Asturkon</span>
+  </div>
+</header>
+<div class="wrap layout">
+  <nav class="side">
+    <p class="navtitle">Manuales</p>
+    <ul>
+<li><a href="/bjj/tatami/">Manual Tatami / Árbitro</a></li>
+<li><a href="/bjj/guia-rapida/">Guía rápida (A4)</a></li>
+<li><a href="/bjj/bracket/" class="active">Manual Bracket (estructura)</a></li>
+<li><a href="/bjj/organizador/">Manual Organizador (estructura)</a></li>
+    </ul>
+    <p class="navtitle">Ficheros</p>
+    <ul>
+      <li><a href="/#descargas">PDFs</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <div class="docmeta">
+      <span class="m"><b>Version</b> v0.1</span>
+      <span class="m"><b>Fecha</b> 2026-10-02</span>
+      <span class="m"><b>Proyecto</b> OpsForge · BJJ Vetusta / Asturkon</span>
+      <span class="m"><b>Estado</b> <span class="badge badge-draft">Draft</span></span>
+    </div>
+    <p class="pdflink">PDF: <a href="/manual-bracket-v0.1.pdf">manual-bracket-v0.1.pdf</a></p>
+    <h1 id="manual-de-bracket">Manual de Bracket</h1>
+<blockquote>
+<p><strong>Estado: ESTRUCTURA.</strong> Este documento es el esqueleto de trabajo del manual. Solo se
+documentará lo verificado contra la aplicación en producción; lo que aún no se ha comprobado
+aparece marcado como <em>Pendiente</em>. No se han inventado credenciales, usuarios ni flujos.</p>
+</blockquote>
+<p><strong>Login exacto pendiente de cierre operativo.</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Versión</strong></td>
+<td>v0.1 (estructura)</td>
+</tr>
+<tr>
+<td><strong>Fecha</strong></td>
+<td>2026-10-02</td>
+</tr>
+<tr>
+<td><strong>Proyecto</strong></td>
+<td>OpsForge · BJJ Vetusta / Asturkon</td>
+</tr>
+<tr>
+<td><strong>Estado</strong></td>
+<td>Draft</td>
+</tr>
+<tr>
+<td><strong>Alcance</strong></td>
+<td>Bracket de BJJ Vetusta (<code>bjjvetusta.opsforge.cc</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="0-que-es-bracket-y-que-no">0. Qué es Bracket y qué no</h2>
+<ul>
+<li><strong>Bracket</strong> es donde vive el torneo: club, torneo, categorías, competidores, equipos, cuadro,
+  combates y clasificaciones.</li>
+<li><strong>No</strong> es la mesa del tatami: el marcador y el reloj se operan en el Tatami
+  (<code>docs.opsforge.cc/bjj/tatami/</code>).</li>
+<li>Hoy el resultado del tatami <strong>no</strong> llega a Bracket automáticamente.</li>
+</ul>
+<h2 id="1-login">1. Login</h2>
+<ul>
+<li>Pantalla de acceso de la aplicación (<code>login</code>). Cuenta de usuario de la aplicación.</li>
+<li>Recuperación de contraseña (<code>password_reset</code>) y alta de cuenta (<code>create_account</code>).</li>
+<li><strong>Pendiente:</strong> <em>Login exacto pendiente de cierre operativo.</em></li>
+<li><strong>Pendiente:</strong> definir quién tiene cuenta, con qué rol y en qué club. <strong>No documentar
+  credenciales en este manual ni en ningún fichero del repositorio.</strong></li>
+</ul>
+<h2 id="2-crear-torneo">2. Crear torneo</h2>
+<ul>
+<li>Sección de <strong>torneos</strong>: listado y ficha del torneo (<code>tournaments</code>, <code>tournaments/[id]</code>).</li>
+<li>Datos de cabecera: nombre, fechas, club, estado del torneo.</li>
+<li><strong>Pendiente:</strong> capturas y pasos exactos del alta de un torneo real.</li>
+</ul>
+<h2 id="3-categorias">3. Categorías</h2>
+<ul>
+<li>División de la competición (cinturones, edades, pesos). En la aplicación se apoya en <strong>stages</strong>.</li>
+<li><strong>Pendiente:</strong> cómo se nombran y se ordenan las categorías en Vetusta, y su relación con las
+  clases de peso.</li>
+</ul>
+<h2 id="4-competidores">4. Competidores</h2>
+<ul>
+<li>Alta y gestión de <strong>jugadores/competidores</strong> (<code>players</code>).</li>
+<li>Datos mínimos, club de origen, categoría asignada.</li>
+<li><strong>Pendiente:</strong> plantilla de alta y criterios de corrección de errores.</li>
+</ul>
+<h2 id="5-equipos">5. Equipos</h2>
+<ul>
+<li>Alta y gestión de <strong>equipos</strong> (<code>teams</code>) y su relación con los competidores (equipos de uno o
+  varios competidores según modalidad).</li>
+<li><strong>Pendiente:</strong> reglas de composición usadas en Vetusta/Asturkon.</li>
+</ul>
+<h2 id="6-stages">6. Stages</h2>
+<ul>
+<li>Estructura de la competición (<code>stages</code>, <code>stage_items</code>, <code>stage_item_inputs</code>) y <strong>rondas</strong>
+  (<code>rounds</code>).</li>
+<li><strong>Pendiente:</strong> qué plantilla de stages se usa por categoría.</li>
+</ul>
+<h2 id="7-brackets">7. Brackets</h2>
+<ul>
+<li>Construcción del cuadro a partir de los stages y sus inscritos.</li>
+<li><strong>Pendiente:</strong> pasos de generación, resiembra y correcciones manuales.</li>
+</ul>
+<h2 id="8-matches">8. Matches</h2>
+<ul>
+<li>Los <strong>combates</strong> (<code>matches</code>) y su estado: pendiente, asignado, en curso, finalizado.</li>
+<li><strong>Pendiente:</strong> cómo se ve un combate desde Bracket y qué campos son oficiales.</li>
+</ul>
+<h2 id="9-asignacion-de-tatamis">9. Asignación de Tatamis</h2>
+<ul>
+<li>Los <strong>tatamis</strong> son "courts" en la aplicación (<code>courts</code>): cada tatami físico es una cancha.</li>
+<li>Un combate se asigna a un tatami; a partir de ahí el Tatami muestra los dos luchadores y el
+  marcador (ver Manual Tatami / Árbitro).</li>
+<li>Hoy la asignación se realiza por el flujo operativo del torneo (el portal con botones está
+  pendiente).</li>
+<li><strong>Pendiente:</strong> pantalla de asignación y criterios de reparto entre Tatamis 1-6.</li>
+</ul>
+<h2 id="10-resultados">10. Resultados</h2>
+<ul>
+<li>Resultado del combate y su reflejo en el cuadro y en las <strong>clasificaciones</strong> (<code>rankings</code>).</li>
+<li><strong>Muy importante:</strong> hoy el resultado del tatami <strong>no se escribe</strong> en Bracket
+  (<code>BRACKET_RESULT_WRITE_ENABLED=false</code>). El cierre definitivo del resultado en Bracket es
+  <strong>manual</strong> y está <strong>pendiente de definición operativa</strong>.</li>
+<li><strong>Pendiente:</strong> procedimiento oficial de cierre de resultados y de publicación de
+  clasificaciones.</li>
+</ul>
+<h2 id="11-troubleshooting">11. Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Síntoma</th>
+<th>Comprobación</th>
+<th>Nota</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No puedo entrar</td>
+<td>¿Correo/cuenta autorizada? ¿Cloudflare Access pide código?</td>
+<td><em>(pendiente de detallar)</em></td>
+</tr>
+<tr>
+<td>El cuadro no refleja un resultado</td>
+<td>El resultado del tatami no se escribe automáticamente</td>
+<td><em>(pendiente de procedimiento)</em></td>
+</tr>
+<tr>
+<td>Un competidor está mal inscrito</td>
+<td>Revisar ficha del competidor y su categoría</td>
+<td><em>(pendiente)</em></td>
+</tr>
+<tr>
+<td>Un combate no aparece en el tatami</td>
+<td>Revisar asignación del combate al tatami</td>
+<td><em>(pendiente)</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="pendiente-de-despliegue">Pendiente de despliegue</h2>
+<ol>
+<li><strong>Write-back</strong> del resultado del tatami a Bracket (<code>BRACKET_RESULT_WRITE_ENABLED=false</code>).</li>
+<li><strong>Portal operativo</strong> con botones a Tatami 1-6, Bracket, Manuales y GitHub.</li>
+<li><strong>Login exacto y roles</strong> documentados.</li>
+<li><strong>Capturas y pasos verificados</strong> de cada sección de este manual.</li>
+</ol>
+<p><em>Manual operativo del árbitro pendiente; antes de entregar <code>/control</code> a usuarios finales se
+publicará documentación online y PDF.</em></p>
+    <p class="footer">Generado desde <code>bjj/bracket.md</code>
+    (sha256 56088fd03499) por <code>docs-site/build.py</code>.</p>
+  </main>
+</div>
+</body>
+</html>

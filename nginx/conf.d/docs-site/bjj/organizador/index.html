@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual del Organizador (estructura) - Centro de documentacion OpsForge</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Centro de documentacion OpsForge</a>
+    <span class="sub">BJJ Vetusta / Asturkon</span>
+  </div>
+</header>
+<div class="wrap layout">
+  <nav class="side">
+    <p class="navtitle">Manuales</p>
+    <ul>
+<li><a href="/bjj/tatami/">Manual Tatami / Árbitro</a></li>
+<li><a href="/bjj/guia-rapida/">Guía rápida (A4)</a></li>
+<li><a href="/bjj/bracket/">Manual Bracket (estructura)</a></li>
+<li><a href="/bjj/organizador/" class="active">Manual Organizador (estructura)</a></li>
+    </ul>
+    <p class="navtitle">Ficheros</p>
+    <ul>
+      <li><a href="/#descargas">PDFs</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <div class="docmeta">
+      <span class="m"><b>Version</b> v0.1</span>
+      <span class="m"><b>Fecha</b> 2026-10-02</span>
+      <span class="m"><b>Proyecto</b> OpsForge · BJJ Vetusta / Asturkon</span>
+      <span class="m"><b>Estado</b> <span class="badge badge-draft">Draft</span></span>
+    </div>
+    
+    <h1 id="manual-del-organizador">Manual del Organizador</h1>
+<blockquote>
+<p><strong>Estado: ESTRUCTURA.</strong> Esqueleto de trabajo. Se completará cuando el flujo operativo esté
+cerrado. No se inventan procedimientos ni credenciales.</p>
+</blockquote>
+<p><strong>Login exacto pendiente de cierre operativo.</strong></p>
+<h2 id="0-papel-del-organizador">0. Papel del organizador</h2>
+<p>El organizador prepara el torneo (torneo, categorías, inscripciones, cuadro) y coordina el día de
+competición (reparto de tatamis, orden de combates, incidencias). No opera el marcador: eso es la
+mesa del árbitro.</p>
+<h2 id="1-antes-del-torneo">1. Antes del torneo</h2>
+<ol>
+<li>Torneo creado y configurado (ver Manual de Bracket).</li>
+<li>Categorías definidas y competidores inscritos y verificados.</li>
+<li>Cuadro generado y revisado.</li>
+<li>Reparto de combates entre Tatamis 1-6.</li>
+</ol>
+<p><strong>Pendiente:</strong> lista de comprobación previa (checklist) y quién la firma.</p>
+<h2 id="2-dia-del-torneo">2. Día del torneo</h2>
+<ol>
+<li>Cada mesa recibe su tatami y su enlace de control (<code>/control</code>).</li>
+<li>Los combates se asignan por el flujo operativo; el tatami refleja la asignación.</li>
+<li>El árbitro opera el combate (ver Manual Tatami / Árbitro y Guía rápida).</li>
+<li><strong>Registro del resultado en acta</strong> antes de liberar el tatami.</li>
+</ol>
+<p><strong>Pendiente:</strong> orden de combates, tiempos de calentamiento, gestión de ausencias y de esperas.</p>
+<h2 id="3-incidencias">3. Incidencias</h2>
+<table>
+<thead>
+<tr>
+<th>Incidencia</th>
+<th>Quién</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Un competidor no aparece</td>
+<td>Organizador</td>
+<td><em>(pendiente de procedimiento)</em></td>
+</tr>
+<tr>
+<td>Asignación equivocada</td>
+<td>Organizador / árbitro</td>
+<td>Cancelar asignación en la mesa (Manual Tatami, sección 16)</td>
+</tr>
+<tr>
+<td>Fallo de pantalla o de acceso</td>
+<td>Soporte técnico</td>
+<td>Manual Tatami, sección 20</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-despues-del-torneo">4. Después del torneo</h2>
+<ol>
+<li>Cerrar resultados en Bracket (<strong>manual</strong>, pendiente de procedimiento).</li>
+<li>Publicar clasificaciones.</li>
+<li>Guardar actas.</li>
+</ol>
+<h2 id="pendiente-de-despliegue">Pendiente de despliegue</h2>
+<ol>
+<li>Portal operativo (Tatami 1-6, Bracket, Manuales, GitHub).</li>
+<li>Procedimiento oficial de cierre de resultados y publicación.</li>
+<li>Checklist del organizador.</li>
+</ol>
+<p><em>Manual operativo del árbitro pendiente; antes de entregar <code>/control</code> a usuarios finales se
+publicará documentación online y PDF.</em></p>
+    <p class="footer">Generado desde <code>bjj/organizador.md</code>
+    (sha256 14742df91461) por <code>docs-site/build.py</code>.</p>
+  </main>
+</div>
+</body>
+</html>

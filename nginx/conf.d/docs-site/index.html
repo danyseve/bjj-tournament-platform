@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centro de documentación OpsForge - Centro de documentacion OpsForge</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Centro de documentacion OpsForge</a>
+    <span class="sub">BJJ Vetusta / Asturkon</span>
+  </div>
+</header>
+<div class="wrap layout">
+  <nav class="side">
+    <p class="navtitle">Manuales</p>
+    <ul>
+<li><a href="/bjj/tatami/">Manual Tatami / Árbitro</a></li>
+<li><a href="/bjj/guia-rapida/">Guía rápida (A4)</a></li>
+<li><a href="/bjj/bracket/">Manual Bracket (estructura)</a></li>
+<li><a href="/bjj/organizador/">Manual Organizador (estructura)</a></li>
+    </ul>
+    <p class="navtitle">Ficheros</p>
+    <ul>
+      <li><a href="/#descargas">PDFs</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <div class="docmeta">
+      <span class="m"><b>Version</b> v0.1</span>
+      <span class="m"><b>Fecha</b> 2026-10-02</span>
+      <span class="m"><b>Proyecto</b> OpsForge · BJJ Vetusta / Asturkon</span>
+      <span class="m"><b>Estado</b> <span class="badge badge-draft">Draft</span></span>
+    </div>
+    
+    <h1 id="centro-de-documentacion-opsforge">Centro de documentación OpsForge</h1>
+<p>Documentación operativa del sistema de competición de <strong>BJJ Vetusta / Asturkon</strong>:
+tatamis, cuadro del torneo y organización del evento.</p>
+<h2 id="manuales">Manuales</h2>
+<table>
+<thead>
+<tr>
+<th>Manual</th>
+<th>Contenido</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="/bjj/tatami/">Manual del Tatami / Árbitro</a></td>
+<td>Mesa del tatami: acceso, marcador, reloj, puntos, ventajas, penalizaciones, finalizar, liberar y cancelar</td>
+<td>Draft v0.1</td>
+</tr>
+<tr>
+<td><a href="/bjj/guia-rapida/">Guía rápida — Árbitro (A4)</a></td>
+<td>Una página para imprimir y plastificar</td>
+<td>Draft v0.1</td>
+</tr>
+<tr>
+<td><a href="/bjj/bracket/">Manual de Bracket (estructura)</a></td>
+<td>Torneo, categorías, competidores, equipos, stages, cuadro, combates y resultados</td>
+<td>Draft v0.1</td>
+</tr>
+<tr>
+<td><a href="/bjj/organizador/">Manual del Organizador (estructura)</a></td>
+<td>Preparación, día de torneo y cierre</td>
+<td>Draft v0.1</td>
+</tr>
+</tbody>
+</table>
+<h2 id="descargas">Descargas</h2>
+<ul>
+<li><a href="/manual-arbitro-tatami-v0.1.pdf">Manual del Tatami / Árbitro v0.1 (PDF)</a></li>
+<li><a href="/guia-rapida-arbitro-tatami-v0.1.pdf">Guía rápida — Árbitro Tatami v0.1 (PDF, A4)</a></li>
+<li><a href="/manual-bracket-v0.1.pdf">Manual de Bracket v0.1 (PDF, estructura)</a></li>
+</ul>
+<p>Los PDF se generan desde la misma fuente Markdown que las páginas HTML
+(<code>docs-site/build.py</code>); no se editan a mano.</p>
+<h2 id="estado-de-la-documentacion">Estado de la documentación</h2>
+<ul>
+<li><strong>Draft</strong>: en uso interno, pendiente de validación por un árbitro y de revisión operativa.</li>
+<li><strong>Validated</strong>: contenido revisado contra el sistema en producción.</li>
+<li><strong>Published</strong>: entregado a los usuarios finales del torneo.</li>
+</ul>
+<p>Los manuales pendientes (write-back del resultado a Bracket, roles internos de árbitro, portal
+del operador) se marcan de forma explícita en cada documento.</p>
+<h2 id="aviso">Aviso</h2>
+<p>El resultado del tatami <strong>no se escribe</strong> hoy en Bracket
+(<code>BRACKET_RESULT_WRITE_ENABLED=false</code>): el árbitro debe <strong>anotar el acta</strong> antes de liberar el
+tatami.</p>
+<h2 id="enlaces">Enlaces</h2>
+<ul>
+<li>Tatami 1: <code>https://tatami1.opsforge.cc</code> (viewer) y <code>https://tatami1.opsforge.cc/control</code> (mesa)</li>
+<li>Bracket: <code>https://bjjvetusta.opsforge.cc</code></li>
+<li>Repositorio: <code>https://github.com/danyseve/bjj-tournament-platform</code> (privado)</li>
+</ul>
+<p><em>Manual operativo del árbitro pendiente; antes de entregar <code>/control</code> a usuarios finales se
+publicará documentación online y PDF.</em></p>
+    <p class="footer">Generado desde <code>index.md</code>
+    (sha256 669b85a73148) por <code>docs-site/build.py</code>.</p>
+  </main>
+</div>
+</body>
+</html>

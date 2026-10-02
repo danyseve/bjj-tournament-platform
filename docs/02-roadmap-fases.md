@@ -1,5 +1,26 @@
 # 02 - Roadmap por fases
 
+## Centro de documentación OpsForge `docs.opsforge.cc` — P2.6A.3 (CLOSED ✅, 2026-10-02)
+
+Commit `feat(docs): publish BJJ documentation center`. Documentación operativa de BJJ
+Vetusta/Asturkon publicada en su propio hostname (`docs.opsforge.cc`), con una sola fuente
+Markdown que genera el sitio HTML y los PDF, detrás de Cloudflare Access.
+
+- Estructura fuente en `docs-site/` (`content/`, `assets/`, `build.py`, `deploy.sh`) con la
+  salida versionada en `nginx/conf.d/docs-site/`; el frontal la sirve desde el bind mount que
+  ya existía, así que **no se recreó ningún contenedor** y no hubo downtime.
+- Primera entrega: **Manual del Tatami / Árbitro v0.1** (21 secciones), **guía rápida A4 de 1
+  página** para imprimir/plastificar, **esqueleto del Manual de Bracket** y estructura del
+  Manual del Organizador. PDF descargables generados desde la misma fuente.
+- Access: app propia `OpsForge Documentation` (`docs.opsforge.cc`), OTP, sesión 7 días,
+  *deny by default*, allow-list explícita de una identidad **copiada de la app de Tatami 1**
+  sin que ningún correo pase por la línea de comandos ni por la salida.
+- DNS: CNAME `docs.opsforge.cc` proxied al túnel `opsforge-oracle`; ingress con la regla nueva
+  preservando `bjjvetusta`, `tatami1`, el catch-all y `warp-routing`.
+- Cero puertos inbound nuevos, cero cambios en Bracket/PostgreSQL/WireGuard/scoreboard,
+  `WRITE=false` intacto y `bjjvetusta`/`tatami1` sin regresión.
+- Detalle completo: `docs/14-documentation-center.md`.
+
 ## Publicación externa del Tatami 1 tras Cloudflare Access — P2.6A.2 (CLOSED ✅, 2026-10-02)
 
 Commit `feat(demo): publish tatami 1 behind cloudflare access`. Tatami 1 publicado en

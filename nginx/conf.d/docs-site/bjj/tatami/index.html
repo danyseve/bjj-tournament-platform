@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual del Tatami / Árbitro - Centro de documentacion OpsForge</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Centro de documentacion OpsForge</a>
+    <span class="sub">BJJ Vetusta / Asturkon</span>
+  </div>
+</header>
+<div class="wrap layout">
+  <nav class="side">
+    <p class="navtitle">Manuales</p>
+    <ul>
+<li><a href="/bjj/tatami/" class="active">Manual Tatami / Árbitro</a></li>
+<li><a href="/bjj/guia-rapida/">Guía rápida (A4)</a></li>
+<li><a href="/bjj/bracket/">Manual Bracket (estructura)</a></li>
+<li><a href="/bjj/organizador/">Manual Organizador (estructura)</a></li>
+    </ul>
+    <p class="navtitle">Ficheros</p>
+    <ul>
+      <li><a href="/#descargas">PDFs</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <div class="docmeta">
+      <span class="m"><b>Version</b> v0.1</span>
+      <span class="m"><b>Fecha</b> 2026-10-02</span>
+      <span class="m"><b>Proyecto</b> OpsForge · BJJ Vetusta / Asturkon</span>
+      <span class="m"><b>Estado</b> <span class="badge badge-draft">Draft</span></span>
+    </div>
+    <p class="pdflink">PDF: <a href="/manual-arbitro-tatami-v0.1.pdf">manual-arbitro-tatami-v0.1.pdf</a></p>
+    <h1 id="manual-del-tatami-arbitro">Manual del Tatami / Árbitro</h1>
+<p>Este manual describe <strong>solo</strong> lo que el sistema hace hoy en producción. Lo que todavía no
+está desplegado se marca de forma explícita en la sección <em>Pendiente de despliegue</em>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Versión</strong></td>
+<td>v0.1</td>
+</tr>
+<tr>
+<td><strong>Fecha</strong></td>
+<td>2026-10-02</td>
+</tr>
+<tr>
+<td><strong>Proyecto</strong></td>
+<td>OpsForge · BJJ Vetusta / Asturkon</td>
+</tr>
+<tr>
+<td><strong>Estado</strong></td>
+<td>Draft (pendiente de validación por un árbitro y de revisión operativa)</td>
+</tr>
+<tr>
+<td><strong>Alcance</strong></td>
+<td>Tatami 1 (<code>tatami1.opsforge.cc</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-que-es-el-tatami">1. Qué es el Tatami</h2>
+<p>El <strong>Tatami</strong> es la aplicación que se usa durante el combate: cronometra, lleva el marcador y
+guarda el resultado del combate en curso. En el sistema convive con otras dos piezas:</p>
+<ul>
+<li><strong>Bracket</strong>: el cuadro del torneo y los combates (quién contra quién). Aquí no se opera.</li>
+<li><strong>Tatami (esta aplicación)</strong>: la mesa de cada tatami. Un tatami es una unidad independiente:
+  el Tatami 1 no ve ni afecta a los demás.</li>
+</ul>
+<p>El resultado que se produce aquí es <strong>el resultado oficial del combate mientras está en
+memoria</strong>. Hoy <strong>no se escribe automáticamente en Bracket</strong> (ver <em>Pendiente de despliegue</em>).</p>
+<p>Estado del sistema en esta versión: <code>BRACKET_RESULT_WRITE_ENABLED=false</code>, es decir, el
+resultado <strong>no se publica</strong> en el cuadro del torneo. Es intencionado.</p>
+<h2 id="2-acceso-con-cloudflare-otp">2. Acceso con Cloudflare OTP</h2>
+<p>El acceso está protegido por <strong>Cloudflare Access</strong> con <strong>código de un solo uso (OTP)</strong> enviado
+al correo autorizado.</p>
+<ol>
+<li>Abre en el navegador la dirección del tatami (por ejemplo <code>https://tatami1.opsforge.cc</code>).</li>
+<li>Cloudflare pedirá tu correo. Escribe <strong>el correo autorizado</strong> y pulsa <em>Send me a code</em>.</li>
+<li>Recibirás un código de un solo uso. Escríbelo en la pantalla de verificación.</li>
+<li>Si el código es correcto, entrarás en la aplicación.</li>
+</ol>
+<p>Notas de operación:</p>
+<ul>
+<li>La sesión dura varias horas (8 h en el Tatami 1). Caducado el plazo, se vuelve a pedir el código.</li>
+<li><strong>No se puede entrar con un correo que no esté en la lista autorizada.</strong> Si un compañero no
+  entra, no es un fallo de la aplicación: su correo no está autorizado.</li>
+<li>El código caduca en pocos minutos y es de un solo uso. Si expira, se pide otro.</li>
+<li><strong>No compartas el enlace fuera del equipo autorizado</strong>: aunque no tengan código, la dirección
+  no debe circular.</li>
+</ul>
+<h2 id="3-viewer-y-control-control-diferencia">3. Viewer <code>/</code> y control <code>/control</code> (diferencia)</h2>
+<p>La misma aplicación tiene dos pantallas con permisos distintos:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Viewer <code>/</code></th>
+<th>Control <code>/control</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Para qué sirve</td>
+<td>Pantalla pública del tatami (proyector, TV, público)</td>
+<td>Mesa del árbitro</td>
+</tr>
+<tr>
+<td>Qué muestra</td>
+<td>Marcador, nombres, categoría, reloj</td>
+<td>Todo lo del viewer <strong>más</strong> los botones de operación</td>
+</tr>
+<tr>
+<td>¿Se puede operar?</td>
+<td><strong>No</strong>. Es solo lectura</td>
+<td><strong>Sí</strong>. Es la única pantalla que opera</td>
+</tr>
+<tr>
+<td>Identificación en pantalla</td>
+<td>El indicador de la esquina dice <code>Read-only</code></td>
+<td>El indicador de la esquina dice <code>Control</code></td>
+</tr>
+</tbody>
+</table>
+<p>Regla práctica: <strong>el proyector siempre en <code>/</code>; el árbitro siempre en <code>/control</code>.</strong> Abrir
+<code>/control</code> en la pantalla del público da a cualquiera la posibilidad de modificar el combate.</p>
+<p>Arriba a la izquierda, en ambos casos, hay una etiqueta de estado de la forma
+<code>Integrated · &lt;estado&gt; · Control|Read-only</code> que indica la pantalla y el estado del combate.</p>
+<p><img alt="Esquema de zonas de la pantalla de control" src="/assets/esquema-control.svg" /></p>
+<p><em>Esquema de zonas (no es una captura). Los números remiten a las secciones siguientes
+de este manual.</em></p>
+<h2 id="4-estado-tatami-libre">4. Estado "Tatami libre"</h2>
+<p>Cuando el tatami no tiene ningún combate asignado, el viewer muestra:</p>
+<blockquote>
+<p><strong>Tatami 1 libre — sin combate asignado</strong></p>
+</blockquote>
+<p>En ese estado el marcador está a cero (<code>0</code> y <code>—</code>), el reloj muestra <code>--:--</code> y <strong>los controles
+del árbitro están bloqueados</strong>: no se puede puntuar porque no hay combate.</p>
+<h2 id="5-combate-asignado">5. Combate asignado</h2>
+<p>Un combate <strong>no se elige desde esta pantalla</strong>. La asignación llega desde el flujo operativo del
+torneo (hoy la realiza el operador; el portal para hacerlo desde el móvil está pendiente, ver
+<em>Pendiente de despliegue</em>).</p>
+<p>Cuando el combate queda asignado, la pantalla pasa al estado <strong><code>ready</code></strong> y aparecen:</p>
+<ul>
+<li>los dos competidores,</li>
+<li>la categoría y la duración,</li>
+<li>el marcador a <strong>0 – 0</strong>,</li>
+<li>el reloj en la <strong>duración de la categoría, sin arrancar</strong>.</li>
+</ul>
+<p><code>ready</code> significa <em>preparado pero el reloj no ha empezado</em>. El árbitro decide cuándo empieza.</p>
+<p><img alt="Diagrama de estados del Tatami" src="/assets/esquema-flujo.svg" /></p>
+<p><em>Estados del Tatami y acciones que los provocan. El estado vive en el servidor: la
+pantalla solo lo refleja.</em></p>
+<h2 id="6-identificacion-de-los-dos-competidores">6. Identificación de los dos competidores</h2>
+<p>Los dos competidores aparecen como <strong>luchador A</strong> (izquierda) y <strong>luchador B</strong> (derecha). Los
+nombres los fija la asignación del torneo: el árbitro <strong>no los escribe ni los corrige aquí</strong>
+(los campos de nombre no se editan en esta versión; ver <em>Qué NO hacer</em>).</p>
+<h2 id="7-marcador">7. Marcador</h2>
+<p>Cada luchador tiene su propio bloque con:</p>
+<ul>
+<li><strong>Puntos totales</strong> del luchador (suma de sus puntos).</li>
+<li>Tres filas de puntuación (4, 3 y 2 puntos), cada una con su contador.</li>
+<li><strong>Ventaja</strong> y <strong>Penalización</strong>, cada una con su contador.</li>
+<li>El <strong>reloj</strong> es común a los dos luchadores.</li>
+</ul>
+<h2 id="8-puntos-4-3-y-2">8. Puntos: 4, 3 y 2</h2>
+<p>Cada fila tiene dos botones: <strong>+</strong> suma y <strong>−</strong> resta (la resta existe para <strong>deshacer un
+error</strong>).</p>
+<table>
+<thead>
+<tr>
+<th>Puntos</th>
+<th>Acción (según la interfaz actual)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>4</strong></td>
+<td>Montada, Toma de espalda</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td>Pase de guardia</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td>Derribo, Raspada, Rodilla al pecho</td>
+</tr>
+</tbody>
+</table>
+<p>El <strong>+</strong> de una fila suma la cantidad de esa fila (4, 3 o 2). El <strong>−</strong> de la misma fila resta esa
+misma cantidad. El contador de la fila y el total del luchador se actualizan a la vez.</p>
+<p>Ejemplo: dos derribos = <code>+2</code> dos veces en la fila <strong>2</strong>; el total del luchador sube a 4.</p>
+<h2 id="9-ventajas">9. Ventajas</h2>
+<p>La <strong>Ventaja</strong> se lleva con <strong>+ / −</strong> (una unidad por pulsación). Se usa para el desempate: a
+igualdad de puntos, gana quien tiene <strong>más ventajas</strong>. Si te equivocas, el <strong>−</strong> quita la ventaja
+que acabas de dar.</p>
+<h2 id="10-penalizaciones">10. Penalizaciones</h2>
+<p>La <strong>Penalización</strong> se lleva igual, con <strong>+ / −</strong> (una unidad por pulsación).</p>
+<p>La aplicación <strong>solo cuenta</strong>: no aplica automáticamente ninguna regla de descalificación ni
+convierte penalizaciones en puntos. Si el combate termina por acumulación de penalizaciones, el
+árbitro lo cierra a mano eligiendo el método <strong>Descalificación</strong> (ver sección 14).</p>
+<h2 id="11-reloj">11. Reloj</h2>
+<p>El reloj es <strong>una cuenta atrás</strong> que empieza en la <strong>duración de la categoría</strong> (por ejemplo
+6:00) y baja hacia cero. Es el mismo para los dos luchadores.</p>
+<p>Controles del reloj:</p>
+<table>
+<thead>
+<tr>
+<th>Botón</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Iniciar / Pausa</strong></td>
+<td>Arranca o detiene la cuenta. Es un interruptor: el mismo botón para y arranca.</td>
+</tr>
+<tr>
+<td><strong>Reiniciar</strong> (icono de apagado)</td>
+<td>Devuelve el reloj a la duración inicial y lo deja parado.</td>
+</tr>
+<tr>
+<td><strong>+ / −</strong> junto al reloj</td>
+<td>Ajusta el tiempo en <strong>un minuto</strong> por pulsación (para corregir la duración).</td>
+</tr>
+</tbody>
+</table>
+<p>Cuando el tiempo llega a cero, el sistema <strong>no elige ganador</strong>: pasa a
+<strong>"Tiempo finalizado — pendiente de resultado"</strong> y el resultado lo decide el árbitro.</p>
+<h2 id="12-iniciar-pausar">12. Iniciar / pausar</h2>
+<p>El combate <strong>solo acepta puntuación y cambios de reloj mientras está en marcha o en pausa</strong>
+(estados <code>ready</code>, <code>running</code>, <code>paused</code>). Con el tiempo agotado o el combate ya finalizado, los
+botones quedan <strong>bloqueados</strong>: no se puede puntuar un combate cerrado.</p>
+<h2 id="13-resultado-ganador">13. Resultado / ganador</h2>
+<p>El ganador <strong>nunca lo calcula la aplicación</strong>, ni siquiera cuando se acaba el tiempo. Lo decide
+el árbitro y lo declara en la pantalla de finalización (sección 15), eligiendo uno de los dos
+competidores:</p>
+<ul>
+<li><code>A · &lt;nombre del luchador A&gt;</code></li>
+<li><code>B · &lt;nombre del luchador B&gt;</code></li>
+</ul>
+<h2 id="14-metodo">14. Método</h2>
+<p>Junto al ganador se declara <strong>cómo</strong> se ganó. La lista de métodos disponibles es:</p>
+<table>
+<thead>
+<tr>
+<th>Valor</th>
+<th>Etiqueta en pantalla</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>points</code></td>
+<td>Puntos</td>
+</tr>
+<tr>
+<td><code>submission</code></td>
+<td>Sumisión</td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td>Decisión</td>
+</tr>
+<tr>
+<td><code>disqualification</code></td>
+<td>Descalificación</td>
+</tr>
+<tr>
+<td><code>walkover</code></td>
+<td>Walkover</td>
+</tr>
+<tr>
+<td><code>referee_stoppage</code></td>
+<td>Parada del árbitro</td>
+</tr>
+<tr>
+<td><code>other</code></td>
+<td>Otro</td>
+</tr>
+</tbody>
+</table>
+<h2 id="15-finalizar-combate">15. Finalizar combate</h2>
+<p>Finalizar es una acción <strong>en dos pasos</strong> para que no se cierre un combate por un toque
+accidental:</p>
+<ol>
+<li>Elige en los desplegables el <strong>Ganador…</strong> y el <strong>Método…</strong>.</li>
+<li>Pulsa <strong>Finalizar…</strong>. Aparecerá la pregunta <em>¿Finalizar como ganador X por Y?</em></li>
+<li>Pulsa <strong>Confirmar finalización</strong> (o <strong>Cancelar</strong> si te has equivocado).</li>
+</ol>
+<p>Tras confirmar, el estado pasa a <strong><code>finished</code></strong>, la pantalla muestra
+<code>Finalizado · Ganador: &lt;nombre&gt; · &lt;método&gt;</code> y <strong>el combate queda cerrado</strong>: ya no acepta
+puntuación ni cambios de reloj. El resultado queda en la pantalla hasta que se libera el tatami.</p>
+<h2 id="16-cancel_assignment-cancelar-asignacion">16. <code>cancel_assignment</code> (Cancelar asignación)</h2>
+<p>Se usa <strong>solo para corregir una asignación equivocada</strong>. El botón <strong>Cancelar asignación</strong> aparece
+únicamente cuando el combate está <strong>recién asignado y sin tocar</strong> (sin puntuación, sin ventajas,
+sin penalizaciones, sin reloj arrancado y sin resultado).</p>
+<ol>
+<li>Pulsa <strong>Cancelar asignación</strong>.</li>
+<li>Confirma con <strong>Confirmar cancelación</strong> (o <strong>Cancelar</strong> para dejarlo como estaba).</li>
+</ol>
+<p>El combate vuelve a quedar <strong>sin asignar</strong> (vuelve a la lista de candidatos) y la pantalla vuelve
+a <em>Tatami libre</em>. <strong>No sirve para terminar un combate</strong>: para eso está Finalizar (sección 15).</p>
+<h2 id="17-clear_match-liberar-tatami">17. <code>clear_match</code> (Liberar Tatami)</h2>
+<p>Es la acción de <strong>cierre, después de finalizar</strong>. Sirve para dejar el tatami limpio para el
+siguiente combate.</p>
+<ol>
+<li>Con el combate en <code>finished</code>, pulsa <strong>Liberar Tatami</strong>.</li>
+<li>Confirma con <strong>Confirmar liberación</strong> (aviso: <em>"¿Liberar el Tatami? El resultado en memoria se
+   perderá."</em>).</li>
+</ol>
+<p>Tras liberar, la pantalla vuelve a <strong>Tatami libre</strong>. Aviso importante: el resultado <strong>se pierde
+de la memoria del sistema</strong>; dado que en esta versión el resultado <strong>no se escribe en Bracket</strong>
+(WRITE deshabilitado), <strong>anota el resultado en el acta del tatami antes de liberar</strong>.</p>
+<h2 id="18-que-hacer-tras-un-reinicio-o-un-refresco">18. Qué hacer tras un reinicio o un refresco</h2>
+<p>El estado <strong>vive en el servidor</strong>, no en el navegador. Por eso:</p>
+<ul>
+<li><strong>Si recargas la página</strong> (<code>F5</code>): vuelves a ver el mismo combate, con el mismo marcador. El
+  reloj sigue donde estaba: el navegador solo dibuja lo que el servidor dice.</li>
+<li><strong>Si se cierra el navegador o se va la pantalla</strong>: al volver a entrar, el combate continúa igual.</li>
+<li><strong>Si un error obliga a recargar</strong>, una vez recargado comprueba el indicador de estado y el
+  marcador (ver sección 20).</li>
+</ul>
+<p>Recomendación: <strong>no recargues con el combate en marcha</strong> salvo necesidad. Si lo haces, revisa el
+reloj y el marcador antes de continuar.</p>
+<h2 id="19-que-no-hacer">19. Qué NO hacer</h2>
+<ul>
+<li><strong>No operes desde dos pantallas a la vez.</strong> Si dos páginas de control lanzan órdenes a la vez,
+  el servidor acepta solo la primera y <strong>descarta la otra sin avisar</strong>. Un control, una mesa.</li>
+<li><strong>No abras <code>/control</code> en la pantalla del público</strong>: cualquiera podría tocar el marcador.</li>
+<li><strong>No compartas el enlace de <code>/control</code></strong> ni el correo autorizado.</li>
+<li><strong>No cierres el combate a mano sin Finalizar</strong>: usa el cuadro de finalización. No hay botón de
+  borrar para eso.</li>
+<li><strong>No uses "Cancelar asignación" para terminar un combate</strong> (solo desasigna combates sin tocar).</li>
+<li><strong>No puntúes después de finalizar</strong>: el sistema bloquea los botones, pero tampoco lo intentes.</li>
+<li><strong>No escribas los nombres de los luchadores a mano</strong>: los fija la asignación; lo que escribas
+  se pierde y no se publica.</li>
+<li><strong>No esperes que el resultado aparezca en Bracket</strong>: en esta versión <strong>no se escribe</strong> (WRITE
+  deshabilitado). Anota el acta.</li>
+<li><strong>No toques la infraestructura</strong> (servicios, contenedores, configuración) durante el torneo.</li>
+</ul>
+<h2 id="20-problemas-frecuentes">20. Problemas frecuentes</h2>
+<table>
+<thead>
+<tr>
+<th>Síntoma</th>
+<th>Causa habitual</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No veo los botones, todo está en gris</td>
+<td>Estás en <code>/</code> (solo lectura)</td>
+<td>Usa <code>/control</code></td>
+</tr>
+<tr>
+<td>El indicador dice <code>Read-only</code> y necesito operar</td>
+<td>Pantalla equivocada</td>
+<td>Abre <code>/control</code></td>
+</tr>
+<tr>
+<td>No me deja añadir puntos</td>
+<td>El combate no está en marcha/pausa (<code>ready</code>, <code>running</code>, <code>paused</code>) o ya está finalizado</td>
+<td>Comprueba el estado y el reloj; si terminó, hay que finalizar</td>
+</tr>
+<tr>
+<td>Pulso y no pasa nada</td>
+<td>La orden ha llegado tarde: otro dispositivo ya había cambiado el combate, así que el servidor la ha descartado (<strong>no avisa</strong>)</td>
+<td>Recarga la página y vuelve a intentarlo</td>
+</tr>
+<tr>
+<td>El reloj no avanza</td>
+<td>Está en pausa (<code>Pausa</code>/<code>Iniciar</code>) o el combate no ha empezado</td>
+<td>Pulsa Iniciar</td>
+</tr>
+<tr>
+<td>Pone "Tiempo finalizado — pendiente de resultado"</td>
+<td>Se ha agotado el tiempo y falta declarar el resultado</td>
+<td>Elige Ganador y Método y finaliza (sección 15)</td>
+</tr>
+<tr>
+<td>El marcador no cambia en la pantalla del público</td>
+<td>La pantalla del público no se ha enterado (se ha caído la conexión)</td>
+<td>Recarga <code>/</code> en la pantalla del público</td>
+</tr>
+<tr>
+<td>Reloj a <code>--:--</code> y todo vacío</td>
+<td>Tatami libre (no hay combate asignado)</td>
+<td>Espera la asignación del operador</td>
+</tr>
+<tr>
+<td>Me pide un código al entrar</td>
+<td>La sesión de Access ha caducado</td>
+<td>Vuelve a entrar con el correo autorizado</td>
+</tr>
+<tr>
+<td>"No se ha podido acceder" / error de Cloudflare</td>
+<td>Correo no autorizado</td>
+<td>No es un fallo de la aplicación: contacta con el equipo organizador</td>
+</tr>
+<tr>
+<td>La pantalla se queda congelada</td>
+<td>Se ha perdido la conexión con el servidor</td>
+<td>Comprueba la red y recarga</td>
+</tr>
+</tbody>
+</table>
+<h2 id="21-contacto-y-soporte">21. Contacto y soporte</h2>
+<ul>
+<li><strong>Soporte operativo durante el torneo</strong>: equipo de organización de BJJ Vetusta / Asturkon
+  (canal interno del club).</li>
+<li><strong>Incidencias técnicas</strong>: repositorio del proyecto en GitHub
+  (<code>danyseve/bjj-tournament-platform</code>), indicando el tatami, la hora y el estado que mostraba la
+  pantalla.</li>
+<li><strong>Documentación</strong>: <code>https://docs.opsforge.cc/bjj/tatami/</code></li>
+</ul>
+<h2 id="pendiente-de-despliegue-no-disponible-hoy">Pendiente de despliegue (NO disponible hoy)</h2>
+<p>Se marca de forma explícita para que nadie lo busque en la aplicación:</p>
+<ol>
+<li><strong>Escritura automática del resultado en Bracket (write-back).</strong> Hoy el resultado se queda en
+   la memoria del tatami: <code>BRACKET_RESULT_WRITE_ENABLED=false</code>. El resultado <strong>no</strong> se publica en
+   el cuadro del torneo ni en Bracket.</li>
+<li><strong>Roles internos de árbitro.</strong> No hay usuarios ni permisos dentro de la aplicación: quien
+   entra en <code>/control</code> puede operar. La única barrera es Cloudflare Access.</li>
+<li><strong>Asignación desde el móvil (portal del operador).</strong> La asignación del combate la hace hoy el
+   operador por el flujo técnico; el portal con botones (Tatami 1-6, Bracket, Manuales, GitHub)
+   está pendiente.</li>
+<li><strong>Enlace "Manual" dentro de <code>/control</code>.</strong> Pendiente de una mini-tarea de interfaz.</li>
+<li><strong>Publicación automática de resultados, clasificaciones y actas.</strong></li>
+</ol>
+<p><em>Manual operativo del árbitro pendiente; antes de entregar <code>/control</code> a usuarios finales se
+publicará documentación online y PDF.</em></p>
+    <p class="footer">Generado desde <code>bjj/tatami-arbitro.md</code>
+    (sha256 8235e8e2bbf0) por <code>docs-site/build.py</code>.</p>
+  </main>
+</div>
+</body>
+</html>

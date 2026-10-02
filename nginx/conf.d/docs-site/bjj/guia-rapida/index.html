@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guía rápida — Árbitro Tatami - Centro de documentacion OpsForge</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Centro de documentacion OpsForge</a>
+    <span class="sub">BJJ Vetusta / Asturkon</span>
+  </div>
+</header>
+<div class="wrap layout">
+  <nav class="side">
+    <p class="navtitle">Manuales</p>
+    <ul>
+<li><a href="/bjj/tatami/">Manual Tatami / Árbitro</a></li>
+<li><a href="/bjj/guia-rapida/" class="active">Guía rápida (A4)</a></li>
+<li><a href="/bjj/bracket/">Manual Bracket (estructura)</a></li>
+<li><a href="/bjj/organizador/">Manual Organizador (estructura)</a></li>
+    </ul>
+    <p class="navtitle">Ficheros</p>
+    <ul>
+      <li><a href="/#descargas">PDFs</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <div class="docmeta">
+      <span class="m"><b>Version</b> v0.1</span>
+      <span class="m"><b>Fecha</b> 2026-10-02</span>
+      <span class="m"><b>Proyecto</b> OpsForge · BJJ Vetusta / Asturkon</span>
+      <span class="m"><b>Estado</b> <span class="badge badge-draft">Draft</span></span>
+    </div>
+    <p class="pdflink">PDF: <a href="/guia-rapida-arbitro-tatami-v0.1.pdf">guia-rapida-arbitro-tatami-v0.1.pdf</a></p>
+    <h1 id="guia-rapida-arbitro-tatami">Guía rápida — Árbitro Tatami</h1>
+<p><strong>Tatami 1 · v0.1 · 2026-10-02 · Draft</strong> — Imprimir y plastificar. Manual completo: <code>docs.opsforge.cc/bjj/tatami/</code></p>
+<h2 id="1-entrar">1. Entrar</h2>
+<ol>
+<li>Abre <code>https://tatami1.opsforge.cc/control</code> (mesa del árbitro).</li>
+<li>Cloudflare pide tu correo autorizado, pulsa <em>Send me a code</em>.</li>
+<li>Escribe el código recibido.</li>
+</ol>
+<p>La pantalla del público va en <code>/</code> (solo lectura). <strong>Nunca en la del público <code>/control</code>.</strong></p>
+<h2 id="2-reconocer-el-estado">2. Reconocer el estado</h2>
+<table>
+<thead>
+<tr>
+<th>En pantalla</th>
+<th>Significa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tatami 1 libre — sin combate asignado</code></td>
+<td>No hay combate. Esperar asignación del operador.</td>
+</tr>
+<tr>
+<td>Dos nombres, categoría, reloj con tiempo y <code>0 - 0</code></td>
+<td>Combate asignado, sin arrancar (<code>ready</code>).</td>
+</tr>
+<tr>
+<td>Reloj corriendo</td>
+<td>Combate en marcha (<code>running</code>).</td>
+</tr>
+<tr>
+<td>Reloj parado con tiempo restante</td>
+<td>En pausa (<code>paused</code>).</td>
+</tr>
+<tr>
+<td><code>Tiempo finalizado — pendiente de resultado</code></td>
+<td>Falta declarar el resultado.</td>
+</tr>
+<tr>
+<td><code>Finalizado · Ganador: X · Método</code></td>
+<td>Combate cerrado. Liberar tatami.</td>
+</tr>
+</tbody>
+</table>
+<p>El indicador de arriba a la izquierda dice <code>Control</code> o <code>Read-only</code>.</p>
+<h2 id="3-puntos-ventajas-y-penalizaciones">3. Puntos, ventajas y penalizaciones</h2>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Cómo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>4 puntos</strong> (Montada, Toma de espalda)</td>
+<td>Fila <strong>4</strong>: pulsar <strong>+</strong></td>
+</tr>
+<tr>
+<td><strong>3 puntos</strong> (Pase de guardia)</td>
+<td>Fila <strong>3</strong>: pulsar <strong>+</strong></td>
+</tr>
+<tr>
+<td><strong>2 puntos</strong> (Derribo, Raspada, Rodilla al pecho)</td>
+<td>Fila <strong>2</strong>: pulsar <strong>+</strong></td>
+</tr>
+<tr>
+<td>Deshacer un punto</td>
+<td>Pulsar <strong>−</strong> en la misma fila</td>
+</tr>
+<tr>
+<td><strong>Ventaja</strong></td>
+<td><strong>+ / −</strong> en Ventaja</td>
+</tr>
+<tr>
+<td><strong>Penalización</strong></td>
+<td><strong>+ / −</strong> en Penalización</td>
+</tr>
+</tbody>
+</table>
+<p>La aplicación solo cuenta: <strong>no</strong> aplica reglas de descalificación automáticamente.
+Solo se puede puntuar con el combate <code>ready</code>, <code>running</code> o <code>paused</code>.</p>
+<h2 id="4-reloj">4. Reloj</h2>
+<table>
+<thead>
+<tr>
+<th>Botón</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Iniciar / Pausa</strong></td>
+<td>Arranca o para la cuenta atrás</td>
+</tr>
+<tr>
+<td><strong>Reiniciar</strong> (icono apagado)</td>
+<td>Vuelve a la duración inicial, parado</td>
+</tr>
+<tr>
+<td><strong>+ / −</strong></td>
+<td>Ajusta <strong>un minuto</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-terminar">5. Terminar</h2>
+<p><strong>Finalizar (dos pasos):</strong></p>
+<ol>
+<li>Elegir <strong>Ganador…</strong> y <strong>Método…</strong> (Puntos, Sumisión, Decisión, Descalificación, Walkover,
+   Parada del árbitro, Otro).</li>
+<li><strong>Finalizar…</strong> → <strong>Confirmar finalización</strong>.</li>
+</ol>
+<p><strong>Después, liberar:</strong> <strong>Liberar Tatami</strong> → <strong>Confirmar liberación</strong>.
+<strong>Antes de liberar, anota el resultado en el acta</strong>: el resultado se pierde de memoria y <strong>no se
+escribe en Bracket</strong>.</p>
+<h2 id="6-cancelar-una-asignacion-equivocada">6. Cancelar una asignación equivocada</h2>
+<p>Solo si el combate está <strong>recién asignado y sin tocar</strong>:
+<strong>Cancelar asignación</strong> → <strong>Confirmar cancelación</strong>. El combate vuelve a candidatos.</p>
+<h2 id="7-si-algo-va-mal">7. Si algo va mal</h2>
+<table>
+<thead>
+<tr>
+<th>Problema</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Un botón no hace nada</td>
+<td>Otro dispositivo cambió el combate: <strong>recarga y repite</strong> (el sistema no avisa)</td>
+</tr>
+<tr>
+<td>No puedo puntuar</td>
+<td>El combate no está en marcha/pausa o ya está finalizado</td>
+</tr>
+<tr>
+<td>Reloj a <code>--:--</code></td>
+<td>Tatami libre: falta asignación</td>
+</tr>
+<tr>
+<td>Pide código al entrar</td>
+<td>Sesión de Access caducada: vuelve a entrar</td>
+</tr>
+<tr>
+<td>Pantalla congelada</td>
+<td>Recarga la página; el estado se recupera del servidor</td>
+</tr>
+<tr>
+<td>No veo los botones</td>
+<td>Estás en <code>/</code> en vez de <code>/control</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Nunca:</strong> operar desde dos pantallas a la vez · usar Cancelar para cerrar un combate ·
+reiniciar servicios durante el torneo.</p>
+    <p class="footer">Generado desde <code>bjj/guia-rapida-arbitro.md</code>
+    (sha256 a771a60d0104) por <code>docs-site/build.py</code>.</p>
+  </main>
+</div>
+</body>
+</html>

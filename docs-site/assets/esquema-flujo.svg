@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" width="900" height="380" role="img" aria-label="Diagrama de estados del Tatami">
+  <rect width="900" height="380" fill="#ffffff"/>
+  <text x="24" y="34" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#10151c">Estados del Tatami y acciones del árbitro</text>
+  <text x="24" y="56" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#6b7280">Cada flecha indica la acción que provoca el cambio. El estado lo mantiene el servidor, no el navegador.</text>
+
+  <!-- libre -->
+  <rect x="30" y="96" width="150" height="70" rx="10" fill="#f7f8fa" stroke="#10151c" stroke-width="2"/>
+  <text x="46" y="126" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#10151c">Tatami libre</text>
+  <text x="46" y="148" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">sin combate asignado</text>
+
+  <!-- ready -->
+  <rect x="240" y="96" width="150" height="70" rx="10" fill="#e8eefc" stroke="#1f6feb" stroke-width="2"/>
+  <text x="256" y="126" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#10151c">Combate asignado</text>
+  <text x="256" y="148" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">marcador a 0, reloj parado</text>
+
+  <!-- running -->
+  <rect x="450" y="96" width="150" height="70" rx="10" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2"/>
+  <text x="466" y="126" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#10151c">Combate en curso</text>
+  <text x="466" y="148" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">el reloj corre</text>
+
+  <!-- awaiting -->
+  <rect x="660" y="96" width="200" height="70" rx="10" fill="#fff8e1" stroke="#b26a00" stroke-width="2"/>
+  <text x="676" y="126" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#10151c">Tiempo finalizado</text>
+  <text x="676" y="148" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">pendiente de resultado</text>
+
+  <!-- finished -->
+  <rect x="660" y="248" width="200" height="70" rx="10" fill="#f0f2f5" stroke="#10151c" stroke-width="2"/>
+  <text x="676" y="278" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#10151c">Combate finalizado</text>
+  <text x="676" y="300" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">ganador y método fijados</text>
+
+  <!-- pausa -->
+  <rect x="450" y="248" width="150" height="70" rx="10" fill="#eef7ee" stroke="#2e7d32" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="466" y="278" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#10151c">En pausa</text>
+  <text x="466" y="300" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">el reloj no corre</text>
+
+  <!-- flechas -->
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#10151c"/>
+    </marker>
+  </defs>
+  <line x1="180" y1="131" x2="236" y2="131" stroke="#10151c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="184" y="122" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1c2024">asignación</text>
+
+  <line x1="390" y1="120" x2="446" y2="120" stroke="#10151c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="392" y="112" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1c2024">iniciar</text>
+
+  <line x1="600" y1="120" x2="656" y2="120" stroke="#10151c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="600" y="112" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1c2024">se agota el tiempo</text>
+
+  <line x1="760" y1="166" x2="760" y2="244" stroke="#10151c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="770" y="210" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1c2024">finalizar (ganador + método)</text>
+
+  <line x1="525" y1="166" x2="525" y2="244" stroke="#2e7d32" stroke-width="2" marker-end="url(#a)"/>
+  <text x="392" y="210" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1c2024">pausar / reanudar (ida y vuelta)</text>
+
+  <!-- cancelar desde ready -->
+  <path d="M300,166 L300,200 L105,200 L105,170" fill="none" stroke="#8c1d18" stroke-width="2" marker-end="url(#a)"/>
+  <text x="120" y="216" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#8c1d18">cancelar asignación (solo si no se ha tocado)</text>
+
+  <!-- liberar -->
+  <path d="M660,283 L600,283 L600,330 L105,330 L105,170" fill="none" stroke="#10151c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="240" y="348" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1c2024">liberar Tatami (clear_match, solo tras finalizar)</text>
+</svg>

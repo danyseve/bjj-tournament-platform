@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" width="900" height="620" role="img" aria-label="Esquema de la pantalla de control del Tatami">
+  <rect width="900" height="620" fill="#ffffff"/>
+  <text x="24" y="34" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#10151c">Esquema de la pantalla de control ( /control )</text>
+  <text x="24" y="56" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#6b7280">Diagrama de zonas, no una captura. Los números remiten a las secciones del manual.</text>
+
+  <!-- Marco -->
+  <rect x="24" y="72" width="852" height="520" rx="10" fill="#f7f8fa" stroke="#10151c" stroke-width="2"/>
+
+  <!-- 1 cabecera -->
+  <rect x="44" y="92" width="812" height="34" rx="6" fill="#10151c"/>
+  <text x="56" y="114" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#ffffff">BJJ Scoreboard</text>
+  <text x="300" y="114" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#c9d1d9">Integrated · ready · Control</text>
+  <circle cx="840" cy="109" r="10" fill="#f0f2f5"/><text x="836" y="113" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#10151c">1</text>
+
+  <!-- competidor 1 -->
+  <rect x="44" y="140" width="392" height="300" rx="8" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="60" y="164" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1c2024">Competidor 1 (nombre de la asignación)</text>
+  <circle cx="410" cy="158" r="10" fill="#e8eefc"/><text x="406" y="162" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">2</text>
+  <rect x="60" y="176" width="360" height="40" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/>
+  <text x="72" y="201" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#6b7280">Nombre (lo fija la asignación; no se edita a mano)</text>
+
+  <text x="60" y="242" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1c2024">Puntos</text>
+  <circle cx="126" cy="238" r="10" fill="#e8eefc"/><text x="122" y="242" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">3</text>
+  <rect x="150" y="226" width="120" height="26" rx="4" fill="#ffffff" stroke="#dfe3e8"/><text x="160" y="244" font-family="Helvetica, Arial, sans-serif" font-size="12">+4 Montada / Espalda</text>
+  <rect x="150" y="258" width="120" height="26" rx="4" fill="#ffffff" stroke="#dfe3e8"/><text x="160" y="276" font-family="Helvetica, Arial, sans-serif" font-size="12">+3 Pase de guardia</text>
+  <rect x="150" y="290" width="120" height="26" rx="4" fill="#ffffff" stroke="#dfe3e8"/><text x="160" y="308" font-family="Helvetica, Arial, sans-serif" font-size="12">+2 Derribo / Raspada</text>
+
+  <rect x="290" y="222" width="40" height="30" rx="4" fill="#e8f5e9" stroke="#9ccc9c"/><text x="303" y="242" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1b5e20">+</text>
+  <rect x="290" y="258" width="40" height="30" rx="4" fill="#e8f5e9" stroke="#9ccc9c"/><text x="303" y="278" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1b5e20">+</text>
+  <rect x="290" y="294" width="40" height="30" rx="4" fill="#e8f5e9" stroke="#9ccc9c"/><text x="303" y="314" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1b5e20">+</text>
+  <rect x="336" y="222" width="40" height="30" rx="4" fill="#fdecea" stroke="#e6a9a2"/><text x="350" y="242" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#8c1d18">−</text>
+  <rect x="336" y="258" width="40" height="30" rx="4" fill="#fdecea" stroke="#e6a9a2"/><text x="350" y="278" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#8c1d18">−</text>
+  <rect x="336" y="294" width="40" height="30" rx="4" fill="#fdecea" stroke="#e6a9a2"/><text x="350" y="314" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#8c1d18">−</text>
+
+  <text x="60" y="356" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1c2024">Ventaja</text>
+  <circle cx="126" cy="352" r="10" fill="#e8eefc"/><text x="122" y="356" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">4</text>
+  <rect x="150" y="340" width="40" height="28" rx="4" fill="#e8f5e9" stroke="#9ccc9c"/><text x="163" y="359" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#1b5e20">+</text>
+  <rect x="196" y="340" width="40" height="28" rx="4" fill="#fdecea" stroke="#e6a9a2"/><text x="210" y="359" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#8c1d18">−</text>
+
+  <text x="60" y="400" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1c2024">Penalización</text>
+  <circle cx="146" cy="396" r="10" fill="#e8eefc"/><text x="142" y="400" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">5</text>
+  <rect x="170" y="384" width="40" height="28" rx="4" fill="#e8f5e9" stroke="#9ccc9c"/><text x="183" y="403" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#1b5e20">+</text>
+  <rect x="216" y="384" width="40" height="28" rx="4" fill="#fdecea" stroke="#e6a9a2"/><text x="230" y="403" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#8c1d18">−</text>
+
+  <!-- competidor 2 -->
+  <rect x="464" y="140" width="392" height="300" rx="8" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="480" y="164" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1c2024">Competidor 2 (mismo bloque, espejo)</text>
+  <rect x="480" y="176" width="360" height="40" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/>
+  <text x="492" y="201" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#6b7280">Nombre (lo fija la asignación; no se edita a mano)</text>
+  <rect x="480" y="226" width="360" height="90" rx="4" fill="#fafbfc" stroke="#eef1f4" stroke-dasharray="4 3"/>
+  <text x="492" y="262" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#6b7280">Mismo juego de botones que el competidor 1:</text>
+  <text x="492" y="282" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#6b7280">puntos +4 / +3 / +2 con + y −</text>
+  <rect x="480" y="340" width="120" height="28" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/><text x="492" y="359" font-family="Helvetica, Arial, sans-serif" font-size="12">Ventaja + / −</text>
+  <rect x="606" y="340" width="150" height="28" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/><text x="618" y="359" font-family="Helvetica, Arial, sans-serif" font-size="12">Penalización + / −</text>
+
+  <!-- reloj -->
+  <rect x="44" y="452" width="300" height="60" rx="8" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="60" y="486" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#10151c">04:37</text>
+  <circle cx="326" cy="464" r="10" fill="#e8eefc"/><text x="322" y="468" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">6</text>
+  <rect x="150" y="470" width="44" height="30" rx="4" fill="#e8f5e9" stroke="#9ccc9c"/><text x="160" y="490" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#1b5e20">&#9654;</text>
+  <rect x="200" y="470" width="44" height="30" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/><text x="214" y="490" font-family="Helvetica, Arial, sans-serif" font-size="13">&#9211;</text>
+  <rect x="250" y="470" width="40" height="30" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/><text x="260" y="490" font-family="Helvetica, Arial, sans-serif" font-size="13">+1&#8242;</text>
+  <rect x="296" y="470" width="40" height="30" rx="4" fill="#f0f2f5" stroke="#dfe3e8"/><text x="306" y="490" font-family="Helvetica, Arial, sans-serif" font-size="13">−1&#8242;</text>
+
+  <!-- paneles de operacion -->
+  <rect x="352" y="452" width="250" height="60" rx="8" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="366" y="474" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1c2024">Finalizar combate</text>
+  <circle cx="588" cy="464" r="10" fill="#e8eefc"/><text x="584" y="468" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">7</text>
+  <text x="366" y="496" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">Ganador + método, con confirmación</text>
+
+  <rect x="614" y="452" width="242" height="60" rx="8" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="628" y="474" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1c2024">Cancelar asignación</text>
+  <circle cx="842" cy="464" r="10" fill="#e8eefc"/><text x="838" y="468" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#1f6feb">8</text>
+  <text x="628" y="496" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#6b7280">Solo si el combate no se ha tocado</text>
+
+  <text x="24" y="612" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#6b7280">Liberar Tatami (9) aparece únicamente cuando el combate ya está finalizado.</text>
+</svg>

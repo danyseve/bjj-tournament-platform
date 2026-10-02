@@ -1,0 +1,62 @@
+{
+  "site": "Centro de documentacion OpsForge",
+  "docs": [
+    {
+      "title": "Centro de documentación OpsForge",
+      "url": "/",
+      "version": "v0.1",
+      "date": "2026-10-02",
+      "state": "Draft",
+      "source": "index.md",
+      "sha256": "669b85a73148",
+      "pdf": null
+    },
+    {
+      "title": "Manual del Tatami / Árbitro",
+      "url": "/bjj/tatami/",
+      "version": "v0.1",
+      "date": "2026-10-02",
+      "state": "Draft",
+      "source": "bjj/tatami-arbitro.md",
+      "sha256": "8235e8e2bbf0",
+      "pdf": "manual-arbitro-tatami-v0.1.pdf",
+      "pdf_pages": 5,
+      "pdf_bytes": 16999
+    },
+    {
+      "title": "Guía rápida — Árbitro Tatami",
+      "url": "/bjj/guia-rapida/",
+      "version": "v0.1",
+      "date": "2026-10-02",
+      "state": "Draft",
+      "source": "bjj/guia-rapida-arbitro.md",
+      "sha256": "a771a60d0104",
+      "pdf": "guia-rapida-arbitro-tatami-v0.1.pdf",
+      "pdf_pages": 1,
+      "pdf_bytes": 5135
+    },
+    {
+      "title": "Manual de Bracket (estructura)",
+      "url": "/bjj/bracket/",
+      "version": "v0.1",
+      "date": "2026-10-02",
+      "state": "Draft",
+      "source": "bjj/bracket.md",
+      "sha256": "56088fd03499",
+      "pdf": "manual-bracket-v0.1.pdf",
+      "pdf_pages": 2,
+      "pdf_bytes": 7377
+    },
+    {
+      "title": "Manual del Organizador (estructura)",
+      "url": "/bjj/organizador/",
+      "version": "v0.1",
+      "date": "2026-10-02",
+      "state": "Draft",
+      "source": "bjj/organizador.md",
+      "sha256": "14742df91461",
+      "pdf": null
+    }
+  ],
+  "built_from_commit": "7ff2210"
+}

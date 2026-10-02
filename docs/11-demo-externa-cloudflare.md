@@ -480,4 +480,20 @@ rondas, Alembic `c1ab44651e79`) y BJJ intacto.
 > Manual operativo del árbitro pendiente; antes de entregar /control a usuarios finales se publicará
 > documentación online y PDF.
 
-Siguiente fase (no ejecutada): **P2.6A.3 — centro de documentación `docs.opsforge.cc`**.
+Siguiente fase ejecutada: **P2.6A.3 — centro de documentación `docs.opsforge.cc`** (ver §20).
+
+## 20. P2.6A.3 — Centro de documentación `docs.opsforge.cc` (CLOSED ✅, 2026-10-02)
+
+La documentación operativa prometida en §19 ya está online:
+
+- Sitio `https://docs.opsforge.cc/` — **Manual del Tatami / Árbitro v0.1** (21 secciones,
+  redactado desde el comportamiento real del marcador), guía rápida A4 de una página,
+  esqueleto del Manual de Bracket y estructura del Manual del Organizador.
+- PDF descargables generados desde la misma fuente Markdown: `manual-arbitro-tatami-v0.1.pdf`,
+  `guia-rapida-arbitro-tatami-v0.1.pdf`, `manual-bracket-v0.1.pdf`.
+- Protegido con Access propio (`OpsForge Documentation`, OTP, sesión 7 días, allow-list
+  explícita de una identidad), DNS e ingress en el túnel `opsforge-oracle`.
+- Sin tocar el Tatami: `/control` no se modificó (el enlace "? Manual" queda como mini-tarea
+  atómica), `WRITE=false` intacto, cero puertos nuevos y `bjjvetusta`/`tatami1` sin regresión.
+
+Detalle técnico y operativo: `docs/14-documentation-center.md`.
