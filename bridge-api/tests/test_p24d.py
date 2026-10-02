@@ -152,6 +152,10 @@ def wire(monkeypatch, bracket, scoreboard):
     monkeypatch.setattr(main, "scoreboard_client", scoreboard)
     monkeypatch.setattr(settings, "bracket_write_username", WRITE_USER)
     monkeypatch.setattr(settings, "bracket_write_password", SecretStr(WRITE_SECRET))
+    # P2.5B: the release switch is off by default. This file exercises the P2.4D
+    # logic, so it turns the switch on explicitly; test_p25b.py owns the off state
+    # (503 result_write_disabled with zero upstream calls).
+    monkeypatch.setattr(settings, "bracket_result_write_enabled", True)
 
 
 @pytest.fixture(autouse=True)
@@ -540,6 +544,9 @@ async def test_34c_without_write_credentials_nothing_is_read_or_written(monkeypa
     scoreboard = FakeScoreboard(final_state())
     monkeypatch.setattr(main, "bracket_client", NoCredentials())
     monkeypatch.setattr(main, "scoreboard_client", scoreboard)
+    # P2.5B: the credentials gate only becomes reachable with the release switch
+    # on; with it off the endpoint refuses earlier (see test_p25b.py).
+    monkeypatch.setattr(settings, "bracket_result_write_enabled", True)
     response, _, _ = await post_result()
     assert response.status_code == 503, response.text
     assert response.json() == {"tatami_id": 1, "status": "failed", "reason": "bracket_write_not_configured",

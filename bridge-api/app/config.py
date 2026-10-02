@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     scoreboard_internal_token: str = ""
     scoreboard_timeout_seconds: float = 10.0
 
+    # P2.5B — interruptor de publicacion de resultados. El release arranca con
+    # esto en false: el codigo de P2.4D viaja en la imagen, pero el endpoint de
+    # resultado responde 503 (result_write_disabled) sin leer el scoreboard ni
+    # tocar Bracket. Solo un true explicito en el entorno lo habilita.
+    bracket_result_write_enabled: bool = False
+
     # P2.4D — credenciales SEPARADAS de escritura en Bracket. No se reutiliza
     # ningun token del navegador ni el secreto interno del scoreboard, y no hay
     # valores por defecto: sin ambas variables no se publica nada.

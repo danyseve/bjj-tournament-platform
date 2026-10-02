@@ -111,6 +111,24 @@ function createServer(legacyRoot = '/app') {
  }, CLOCK_TICK_MS);
  ticker.unref();
  server.on('close', () => clearInterval(ticker));
+ // Read-only health probe (P2.5B). Deliberately unauthenticated so a container
+ // healthcheck does not need the internal token, and deliberately silent about
+ // everything else: no state contents, no fight identity, no secret. It reports
+ // the mode it runs in and whether the optional state file could be written,
+ // which is the part of readiness a process that is merely "up" does not prove.
+ // A configured store that cannot be written is a failure, not a warning: the
+ // answer is 503 so the container is reported unhealthy instead of quietly
+ // scoring a tatami whose result would be lost on restart.
+ app.get('/health', (req, res) => {
+  const enabled = stateFile !== null;
+  const ready = enabled && stateFile.ready();
+  res.status(enabled && !ready ? 503 : 200).json({
+   status: enabled && !ready ? 'degraded' : 'ok',
+   service: 'bjj-scoreboard',
+   mode: 'integrated',
+   state_store: {enabled, ready}
+  });
+ });
  app.get('/internal/tatamis/1/state', requireInternalToken, (req, res) => res.json({state: store.snapshot()}));
  app.put('/internal/tatamis/1/assignment', requireInternalToken, (req, res) => {
   const result = store.assign(req.body);

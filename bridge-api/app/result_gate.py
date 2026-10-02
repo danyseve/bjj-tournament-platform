@@ -46,6 +46,8 @@ REASON_CONTRADICTS = "winner_contradicts_points"
 
 # Endpoint-level decisions (same stable, non-sensitive naming).
 REASON_WRITE_NOT_CONFIGURED = "bracket_write_not_configured"
+# P2.5B — the release switch is off: the endpoint refuses before any read or write.
+REASON_WRITE_DISABLED = "result_write_disabled"
 REASON_PARTICIPANTS = "participants_mismatch"
 REASON_BRACKET_CHANGED = "bracket_scores_changed"
 REASON_NOT_PRISTINE = "bracket_match_not_pristine"

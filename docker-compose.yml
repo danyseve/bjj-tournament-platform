@@ -32,6 +32,12 @@ services:
     restart: unless-stopped
 
   bracket:
+    # P2.5B — release de Tatami 1 preparado, NO aplicado: la imagen release
+    # (danyseve1/bracket-bjj:47bc129-r3, con el arreglo DEF-01/DEF-02) existe ya
+    # en local, pero NO se ha publicado, asi que aqui sigue el digest productivo
+    # de e6abd7d. En P2.5C se sustituye esta linea por el digest release:
+    #   image: danyseve1/bracket-bjj@sha256:<digest de 47bc129-r3>
+    # y solo entonces se recrea el contenedor.
     image: danyseve1/bracket-bjj@sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8
     container_name: bracket
 #  bracket:
@@ -63,23 +69,45 @@ services:
         ipv4_address: 172.30.0.20
     restart: unless-stopped
 
+  # P2.5B — release de Tatami 1 (Bridge + scoreboard) bajo el perfil "tatami1".
+  # Consecuencia operativa buscada: un `up -d` sin perfil NO toca la produccion
+  # actual; el release se enciende con `--profile tatami1`, que es tambien el
+  # unico comando que aplica (y que revierte) el digest nuevo de Bracket.
+  #
+  # Las cuatro variables marcadas con :? son obligatorias: sin ellas el fichero NO
+  # se renderiza (fail-fast pedido, en lugar de un valor por defecto silencioso).
+  # Hasta que .env las defina, cualquier comando de Compose en el host fallara
+  # nombrando la que falta; el paso 0 de P2.5C es anadirlas.
   bridge-api:
     build:
       context: ./bridge-api
+    # P2.5C: publicar la imagen release y fijarla aqui por digest, sin `build:`.
+    # image: danyseve1/bjj-bridge-api@sha256:<digest de release>
     container_name: bjj-bridge-api
-    profiles: ["multitatami"]
+    profiles: ["tatami1"]
     depends_on:
-      - bracket
-    ports:
-      - "${BRIDGE_PORT:-8500}:8500"
+      bracket:
+        condition: service_healthy
+      scoreboard-tatami-1:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8500/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     environment:
-      BRACKET_API_URL: http://bracket:8400/api
-      SCOREBOARD_TATAMI_1_URL: http://scoreboard-tatami-1:3000
-      SCOREBOARD_TATAMI_2_URL: http://scoreboard-tatami-2:3000
-      SCOREBOARD_TATAMI_3_URL: http://scoreboard-tatami-3:3000
-      SCOREBOARD_TATAMI_4_URL: http://scoreboard-tatami-4:3000
-      SCOREBOARD_TATAMI_5_URL: http://scoreboard-tatami-5:3000
-      SCOREBOARD_TATAMI_6_URL: http://scoreboard-tatami-6:3000
+      BRACKET_API_URL: ${BRACKET_API_URL:?obligatoria}
+      SCOREBOARD_TATAMI_1_URL: ${SCOREBOARD_TATAMI_1_URL:?obligatoria}
+      SCOREBOARD_INTERNAL_TOKEN: ${SCOREBOARD_INTERNAL_TOKEN:?obligatoria}
+      BRACKET_RESULT_WRITE_ENABLED: ${BRACKET_RESULT_WRITE_ENABLED:?obligatoria}
+      # Credenciales de escritura en Bracket: OPCIONALES a proposito. Con
+      # WRITE=false el Bridge arranca sin ellas; con WRITE=true su ausencia falla
+      # en cerrado (503 bracket_write_not_configured) sin escribir nada.
+      BRACKET_WRITE_USERNAME: ${BRACKET_WRITE_USERNAME:-}
+      BRACKET_WRITE_PASSWORD: ${BRACKET_WRITE_PASSWORD:-}
+    # Sin `ports`: nadie necesita el Bridge desde el host en este release. El
+    # acceso es exclusivamente interno por bjj-net (nginx sigue igual).
     networks:
       - bjj-net
     restart: unless-stopped
@@ -87,10 +115,29 @@ services:
   scoreboard-tatami-1:
     build:
       context: ./services/scoreboard
+    # P2.5C: publicar la imagen release (adapter con /health y persistencia) y
+    # fijarla aqui por digest, sin `build:`.
+    # image: danyseve1/bjj-scoreboard@sha256:<digest de release>
     container_name: scoreboard-tatami-1
-    profiles: ["multitatami"]
-    ports:
-      - "${SCOREBOARD_TATAMI_1_PORT:-3001}:3000"
+    profiles: ["tatami1"]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "const http=require('node:http');const req=http.get({host:'127.0.0.1',port:3000,path:'/health',timeout:4000},res=>{res.resume();process.exit(res.statusCode>=200&&res.statusCode<400?0:1);});req.on('timeout',()=>{req.destroy();process.exit(1);});req.on('error',()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    environment:
+      SCOREBOARD_MODE: integrated
+      SCOREBOARD_INTERNAL_TOKEN: ${SCOREBOARD_INTERNAL_TOKEN:?obligatoria}
+      SCOREBOARD_CONTROL_TOKEN: ${SCOREBOARD_CONTROL_TOKEN:?obligatoria}
+      SCOREBOARD_STATE_FILE: /state/state.json
+    # Persistencia del Tatami 1. El directorio del host lo crea el runbook de
+    # P2.5C (NO se crea aqui) y debe pertenecer al uid del usuario del contenedor
+    # (node, uid 1000): si no, /health responde 503 y el servicio refusa arrancar
+    # antes que perder un resultado.
+    volumes:
+      - /home/ubuntu/data/bjj-tournament-platform/tatami-1:/state
+    # Sin `ports`: solo red interna.
     networks:
       - bjj-net
     restart: unless-stopped

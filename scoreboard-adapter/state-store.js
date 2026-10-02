@@ -33,6 +33,22 @@ function createStateFile(options = {}) {
  if (typeof file !== 'string' || file.length === 0) throw new StateFileError('A non-empty state file path is required');
  // Injectable filesystem: a test seam only, the default is the real one.
  const fs = options.fs || nodeFs;
+ // W_OK is 2 on POSIX; read from the injected filesystem when it exposes it, so a
+ // test double without `constants` still works.
+ const W_OK = fs.constants && typeof fs.constants.W_OK === 'number' ? fs.constants.W_OK : 2;
+ // Readiness probe for the health endpoint (P2.5B). Read-only by contract: it
+ // creates nothing, moves nothing and never rewrites the document — it only
+ // answers whether a save could land right now (directory present and writable,
+ // and the existing file writable too).
+ function ready() {
+  try {
+   fs.accessSync(path.dirname(file), W_OK);
+   if (fs.existsSync(file)) fs.accessSync(file, W_OK);
+   return true;
+  } catch (ignored) {
+   return false;
+  }
+ }
  // Missing file => undefined (never initialized). Anything else that goes wrong
  // raises, so the process can fail closed instead of guessing.
  function load() {
@@ -77,6 +93,6 @@ function createStateFile(options = {}) {
   } catch (ignored) {}
   return true;
  }
- return {load, save, file};
+ return {load, save, ready, file};
 }
 module.exports = {createStateFile, StateFileError};

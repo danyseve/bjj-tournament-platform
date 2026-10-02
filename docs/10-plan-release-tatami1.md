@@ -1,7 +1,11 @@
-# 10 - Plan de release controlado del Tatami 1 (P2.5A)
+# 10 - Plan de release controlado del Tatami 1 (P2.5A) — prerrequisitos P2.5B
 
-Estado: **plan aprobable, sin ejecutar**. No se ha construido ninguna imagen de release, no se ha
-publicado nada, no se ha tocado Compose, `.env`, nginx, WireGuard, PostgreSQL ni el Bracket productivo.
+Estado: **artefactos de release listos, sin desplegar**. P2.5A dejó el plan escrito; P2.5B (§19)
+implementa los prerrequisitos técnicos: interruptor de escritura en el Bridge (default `false`),
+dependencias pinadas, Dockerfiles de release, servicios `bridge-api` y `scoreboard-tatami-1` bajo el
+perfil `tatami1` del Compose, healthchecks reales y contrato de secretos. Sigue **sin construir imagen
+publicada, sin publicar, sin tocar `.env` productivo, nginx, WireGuard, PostgreSQL ni el Bracket
+productivo**, y sin habilitar la escritura de resultados.
 
 Objetivo: desplegar en Oracle las versiones ya validadas de **Bracket corregido**, **Bridge API**,
 **scoreboard del Tatami 1 integrado** y su **persistencia**, con orden secuencial, rollback por
@@ -78,6 +82,11 @@ Producción en ejecución (inmutable durante P2.5A):
 Coincide con lo esperado: nginx sin cambio, PostgreSQL sin cambio, WireGuard fuera, Bracket cambio de
 imagen, Bridge y scoreboard-tatami-1 servicios nuevos.
 
+P2.5B deja los tres artefactos **construidos en local y sin publicar** (IDs en §19): la imagen release
+del Bracket desde `47bc129`, la del Bridge y la del scoreboard. Ninguno se ha subido a registro alguno,
+así que en §2 la columna "VERSIÓN OBJETIVO" sigue sin digest real que pinear: eso es exactamente lo que
+cierra P2.5C.
+
 ---
 
 ## 3. BRACKET RELEASE IMAGE
@@ -103,7 +112,8 @@ docker build --no-cache \
 | Healthcheck | `wget -q -O - http://127.0.0.1:8400/api/ping | grep -q '"ping"'` (definido **en la imagen**) |
 | Puerto | `8400` (expuesto por la imagen; el Compose lo publica con `${BRACKET_PORT:-8400}`) |
 | Migraciones | `AUTO_RUN_MIGRATIONS=false` en el Compose; el arranque **no** migra (evidencia: `services/bracket/backend/bracket/app.py:48` solo migra si `config.auto_run_migrations`, `config.py:40`) |
-| Digest esperado tras build | **No es predecible**: se obtiene del build/push y se registra aquí. Mientras no exista, la línea del Compose queda con marcador `<TBD>` y **no se despliega** |
+| Digest esperado tras build | **No es predecible**: se obtiene del build/push y se registra aquí. Mientras no exista, la línea del Compose queda con el digest productivo y **no se despliega** |
+| Imagen local construida en P2.5B | `danyseve1/bracket-bjj:47bc129-r3` → Image ID `sha256:59944e01606c1e7db4f1e06b9476313db82b804f883ae1cbaa749653ae93743b` (arm64, `user=bracket`, `revision=47bc129d467a9544edd835aacbd49b5879e8adf6`, healthcheck `/api/ping`, 330 MB). **Sin publicar**: no hay RepoDigest |
 | Digest del test P2.4D | `sha256:9b1a6c96f3e820511f7c23f446f622e549e09f790eda0c1bb279c488c8dcd8d0` — **NO es el digest de release**: se construyó con `RECIPE_REVISION=r3-p24d-test`, y esa etiqueta distinta cambia el `config` y por tanto el digest |
 
 Validación estática de la receta ya disponible (sin construir nada nuevo en P2.5A):
@@ -125,26 +135,22 @@ Validación estática de la receta ya disponible (sin construir nada nuevo en P2
 
 Base: `bridge-api/Dockerfile`, contexto `./bridge-api`, HEAD del repo principal en el momento del build.
 
-Estado actual del Dockerfile (revisado, sin modificar): `FROM python:3.12-slim`, `pip install -r
-requirements.txt`, `COPY app ./app`, `CMD uvicorn app.main:app --host 0.0.0.0 --port 8500`. Sin fijar
-la base por digest, **sin usuario no-root**, sin `HEALTHCHECK`, sin check de dependencias.
+**Implementado en P2.5B** (`bridge-api/Dockerfile`):
 
-Requisitos de la imagen release (a implementar en P2.5B, no en P2.5A):
-
-1. Base `python:3.12-slim` **pinada por digest** (arm64).
-2. Usuario no-root (mismo criterio que Bracket/scoreboard).
-3. **`requirements.txt` pinado**: hoy son 5 líneas sin versión (`fastapi`, `uvicorn[standard]`,
-   `httpx`, `pydantic`, `pydantic-settings`). Sin versiones fijas la imagen **no es reproducible**;
-   es un prerrequisito de release (fijar versiones y, si se quiere, hash de las mismas).
-4. `HEALTHCHECK` contra `GET /health` (existe y no pide token).
-   Nota técnica: la imagen no instala `curl`/`wget` en sus propias capas y las bases `-slim` los purgan,
-   así que el probe debe usar el intérprete ya presente, p. ej.
-   `python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8500/health').status==200 else 1)"`.
-   El probe exacto se valida al implementarlo.
+1. Base `python:3.12-slim@sha256:18d23907c5d7ef2ca1b0ea8b4a73fe4a6ae47114c257a1afed8bc66c3886f8cb`
+   (digest de `linux/arm64`, resuelto del manifiesto y fijado en el `FROM`).
+2. Usuario no-root `bridge` (uid 10002 fijo) y `USER bridge` antes del `CMD`.
+3. `requirements.txt` **pinado** (directas + transitivas, §19) y `requirements-dev.txt` aparte, que
+   **no** entra en la imagen. Instalación en su propia capa y comprobación de import tras instalar.
+4. `HEALTHCHECK` contra `GET /health` con el intérprete de la imagen:
+   `python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8500/health', timeout=4)"`.
 5. `EXPOSE 8500` documental; **sin publicar el puerto al host** (§7).
+6. Check de imagen: falla la build si queda algún fichero world-writable bajo `/app`.
 
-Tag propuesto: `danyseve1/bjj-bridge-api:<sha7-del-commit-principal>-r1` (el `sha7` concreto es el HEAD
-en el momento del build; hoy sería `3b3ed63`, pero cambiará si P2.5B añade el flag y el healthcheck).
+Imagen de validación construida: `bjj-bridge-api:p2.5b-test` →
+`sha256:c2080cc69aad…` (arm64, `user=bridge`, `8500/tcp`, healthcheck de `/health`, sin `pytest`/`mypy`/
+`ruff` dentro). **No publicada**: en P2.5C se publica y se pinea por digest con el tag
+`danyseve1/bjj-bridge-api:<sha7-del-commit-principal>-r1`.
 
 Variables (solo nombres; clasificación por obligatoriedad/opcionalidad/sensibilidad):
 
@@ -153,7 +159,7 @@ Variables (solo nombres; clasificación por obligatoriedad/opcionalidad/sensibil
 | `BRACKET_API_URL` | sí | no | valor operativo `http://bracket:8400/api` |
 | `SCOREBOARD_TATAMI_1_URL` | sí | no | `http://scoreboard-tatami-1:3000`; el código trae default, pero debe fijarse explícitamente |
 | `SCOREBOARD_INTERNAL_TOKEN` | **sí** | **SÍ** | el mismo valor que recibe el scoreboard; sin él los endpoints internos responden fail-closed |
-| `BRACKET_RESULT_WRITE_ENABLED` | sí (con valor `false`) | no | **no existe en el código todavía** ⇒ prerrequisito PRE-DEPLOY (§10) |
+| `BRACKET_RESULT_WRITE_ENABLED` | sí (con valor `false`) | no | **implementado en P2.5B** (§19): default `false`, y con `false` el endpoint de resultado responde 503 `result_write_disabled` sin leer el scoreboard ni llamar a Bracket |
 | `BRACKET_WRITE_USERNAME` | **no en el primer release** | **SÍ** | dejarla **ausente** es parte del diseño: sin credencial el endpoint de escritura responde 503 aunque alguien active el flag por error |
 | `BRACKET_WRITE_PASSWORD` | **no en el primer release** | **SÍ** | ídem |
 | `SCOREBOARD_TATAMI_2_URL` … `_6_URL` | no | no | se mantienen como están; Tatami 2–6 no se habilitan |
@@ -182,8 +188,14 @@ Variables/configuración:
 | `SCOREBOARD_STATE_FILE` | sí (si se quiere persistencia) | no | opt-in de P2.4B; sin ella el estado solo vive en memoria |
 | `PORT` | no | no | default 3000 |
 
-Requisitos de la imagen release (P2.5B): tag/digest propio, `HEALTHCHECK` y etiqueta que registre
-también el commit del repo principal (hoy solo etiqueta el submódulo `c49df6d…`).
+Requisitos de la imagen release — **implementados en P2.5B**: `HEALTHCHECK` real contra `GET /health`
+en modo integrado (en standalone, que sigue funcionando, sondea `/`), directorio `/state` creado con
+ownership del usuario `node`, y `docker/scoreboard/Dockerfile` sin más cambios. Imagen de validación:
+`bjj-scoreboard:p2.5b-test` → `sha256:5b1a2a5fd238…` (arm64, `user=node`, `3000/tcp`).
+
+`GET /health` (nuevo, sin token, sin secretos y sin contenido del estado) devuelve
+`{"status":"ok","service":"bjj-scoreboard","mode":"integrated","state_store":{"enabled":true,"ready":true}}`,
+y responde **503** si la persistencia está activada pero no es escribible (fail-closed).
 
 ### Persistencia productiva (diseño)
 
@@ -191,9 +203,9 @@ también el commit del repo principal (hoy solo etiqueta el submódulo `c49df6d�
 |---|---|
 | Ruta host propuesta | `/home/ubuntu/data/bjj-tournament-platform/tatami-1/` (**no existe hoy**, no se crea en P2.5A) |
 | Alternativa descartada | `./data/tatami-1` dentro del repo (precedente de WireGuard): el árbol es un checkout git y `data/` está en `.gitignore`; se descarta para no mezclar estado de servicio con el repo y para que `git clean`/reclonados no puedan tocarlo |
-| Mount | `-v /home/ubuntu/data/bjj-tournament-platform/tatami-1:/var/lib/bjj/tatami-1` |
-| Fichero | `state.json` (una sola ruta; `SCOREBOARD_STATE_FILE=/var/lib/bjj/tatami-1/state.json`) |
-| Ownership | `1000:1000` (usuario `node` de la imagen oficial; se valida funcionalmente con la prueba de persistencia de §14, sin contenedores desechables) |
+| Mount | `-v /home/ubuntu/data/bjj-tournament-platform/tatami-1:/state` (ruta de contenedor `/state`, fijada por el release P2.5B; sustituye a la propuesta inicial `/var/lib/bjj/tatami-1`) |
+| Fichero | `state.json` (una sola ruta; `SCOREBOARD_STATE_FILE=/state/state.json`) |
+| Ownership | `1000:1000`. **Atención**: el usuario `node` de la imagen es uid 1000, pero `ubuntu` en `oracle-jiujitsu` es **uid 1001**, así que crear el directorio como `ubuntu` **no basta**: el release exige `sudo mkdir -p` + `sudo chown 1000:1000` + `chmod 700`. Verificado en aislado: con el directorio en 1001 el scoreboard **refusa arrancar** (EACCES) y `GET /health` responde 503 (`state_store.ready=false`) |
 | Permisos | directorio `0700`; el fichero lo fija el propio adapter a `0600` (`state-store.js`: `fchmodSync(handle, 0o600)`) |
 | Escritura | atómica: fichero temporal + `fsync` + `rename` sobre la ruta final + `fsync` del directorio (best effort). El fichero final nunca queda a medias |
 | Backup | copia de `state.json` (con `sha256sum` registrado) antes de cualquier cambio y en el preflight de cada ventana; el estado **no** está en PostgreSQL |
@@ -204,65 +216,7 @@ también el commit del repo principal (hoy solo etiqueta el submódulo `c49df6d�
 
 ---
 
-## 6. COMPOSE TARGET (diseño; **no aplicado**)
-
-Fichero: `docker-compose.yml` (el que realmente usan los contenedores productivos). Cambio mínimo,
-Tatami 1 solamente.
-
-```yaml
-  bracket:
-    # ÚNICA línea que cambia en un servicio existente:
-    image: danyseve1/bracket-bjj@sha256:<TBD-DIGEST-RELEASE-47BC129>   # antes: …@sha256:e07ec8b4…8df8
-    # el resto (healthcheck, depends_on, ports, environment, red, restart) se mantiene igual
-
-  bridge-api:
-    image: danyseve1/bjj-bridge-api@sha256:<TBD-DIGEST-RELEASE-BRIDGE>  # antes: build: ./bridge-api
-    container_name: bjj-bridge-api
-    profiles: ["tatami1"]                    # antes: ["multitatami"]
-    depends_on:
-      - bracket
-      - scoreboard-tatami-1
-    # ports: ELIMINADO (sin publicación al host, §7)
-    environment:
-      BRACKET_API_URL: http://bracket:8400/api
-      SCOREBOARD_TATAMI_1_URL: http://scoreboard-tatami-1:3000
-      SCOREBOARD_INTERNAL_TOKEN: ${SCOREBOARD_INTERNAL_TOKEN:?requerido}
-      BRACKET_RESULT_WRITE_ENABLED: "false"   # §10: arranque en modo lectura
-      # sin BRACKET_WRITE_USERNAME/PASSWORD: la escritura queda doblemente impedida
-    healthcheck:                              # NUEVO
-      test: ['CMD-SHELL', 'python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8500/health\").status==200 else 1)"']
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    networks:
-      - bjj-net
-    restart: unless-stopped
-
-  scoreboard-tatami-1:
-    image: danyseve1/bjj-scoreboard@sha256:<TBD-DIGEST-RELEASE-SCOREBOARD>  # antes: build: ./services/scoreboard
-    container_name: scoreboard-tatami-1
-    profiles: ["tatami1"]                     # antes: ["multitatami"]
-    # ports: ELIMINADO (sin publicación al host, §7)
-    environment:
-      SCOREBOARD_MODE: integrated
-      SCOREBOARD_INTERNAL_TOKEN: ${SCOREBOARD_INTERNAL_TOKEN:?requerido}
-      SCOREBOARD_CONTROL_TOKEN: ${SCOREBOARD_CONTROL_TOKEN:?requerido}
-      SCOREBOARD_STATE_FILE: /var/lib/bjj/tatami-1/state.json
-    volumes:                                  # NUEVO
-      - /home/ubuntu/data/bjj-tournament-platform/tatami-1:/var/lib/bjj/tatami-1
-    healthcheck:                              # NUEVO (la imagen no trae curl/wget; se usa node)
-      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:3000/").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))']
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    networks:
-      - bjj-net
-    restart: unless-stopped
-
-  # scoreboard-tatami-2 … -6 : SIN CAMBIOS (siguen en `profiles: ["multitatami"]`, sin habilitar)
-```
+## 6. COMPOSE TARGET (aplicado al fichero; **no ejecutado**)
 
 ### Profile: ¿mantener `multitatami` o pasar a servicio explícito?
 
@@ -356,6 +310,20 @@ Regla explícita: **no se abre ninguna interfaz de control al público**; todo a
 
 Secretos nuevos: `SCOREBOARD_INTERNAL_TOKEN`, `SCOREBOARD_CONTROL_TOKEN` y (solo para una fase
 posterior) la credencial de escritura en Bracket (`BRACKET_WRITE_USERNAME`/`BRACKET_WRITE_PASSWORD`).
+No secretos, pero obligatorios para renderizar el Compose: `BRACKET_API_URL`, `SCOREBOARD_TATAMI_1_URL`
+y `BRACKET_RESULT_WRITE_ENABLED`.
+
+**Contrato de nombres publicado en `.env.example` (P2.5B)**, sin valores reales y con placeholders
+obvios:
+
+| Nombre | Estado en el `.env` productivo | Nota |
+|---|---|---|
+| `SCOREBOARD_INTERNAL_TOKEN` | **ausente** | token interno del scoreboard (header `X-Internal-Token`), compartido con el Bridge |
+| `SCOREBOARD_CONTROL_TOKEN` | **ausente** | token de control del scoreboard |
+| `BRACKET_RESULT_WRITE_ENABLED` | **ausente** | no es secreto; valor `false` en el primer release |
+| `SCOREBOARD_TATAMI_1_URL` | **ausente** | no es secreto |
+| `BRACKET_API_URL` | presente | no es secreto |
+| `BRACKET_WRITE_USERNAME` / `BRACKET_WRITE_PASSWORD` | ausentes | **a propósito**: no se configuran en el primer release |
 
 | Dónde viven | Dónde NO deben estar |
 |---|---|
@@ -388,14 +356,20 @@ la escritura queda impedida por dos motivos independientes (flag `false` y crede
 Objetivo: que el primer despliegue **no** habilite la escritura automática hacia Bracket, aunque la
 imagen del Bridge ya contenga P2.4D.
 
-- Flag propuesta: `BRACKET_RESULT_WRITE_ENABLED`, booleana, **default `false`**.
-- **Estado en el código a día de hoy: no existe** (`bridge-api/app/config.py` no la define). Por tanto
-  es un **requisito PRE-DEPLOY** y **no se implementa en P2.5A** (§10 lo pide así explícitamente).
-- Comportamiento a implementar en P2.5B: leída en `config.py`, con `false` por defecto; si está
-  desactivada, `POST /tatamis/{id}/result` responde 503 con un motivo explícito
-  (`result_write_disabled`) **sin leer el scoreboard y sin tocar Bracket**. Los caminos de lectura
-  (`/health`, `/health/bracket`, `/tatamis/1/candidates`, `/tatamis/1/assign-match`) no se ven
-  afectados: el release arranca en modo lectura/asignación.
+- Flag: `BRACKET_RESULT_WRITE_ENABLED`, booleana, **default `false`** — **implementada en P2.5B**
+  (`bridge-api/app/config.py`: `bracket_result_write_enabled: bool = False`).
+- Con `false`, `POST /tatamis/1/result` responde **503** con `status="failed"` y
+  `reason="result_write_disabled"` (`result_gate.REASON_WRITE_DISABLED`) **antes de tocar nada**: el
+  chequeo de la flag es anterior a la comprobación de credenciales y a la lectura del scoreboard, así
+  que con la escritura desactivada **no hay lectura de scoreboard, ni login, ni GET/PUT a Bracket**.
+  Evidencia: `bridge-api/tests/test_p25b.py` (test 3) usa dobles envenenados que fallan si se les llama,
+  y en la pila aislada de §19 el Bracket registró **0 GET/PUT a `/matches` y 0 `POST /api/token`**
+  mientras el endpoint devolvía 503.
+- Los caminos de lectura (`/health`, `/health/bracket`, `/tatamis/1/candidates`,
+  `/tatamis/1/assign-match`) no se ven afectados: el release arranca en modo lectura/asignación.
+- Credenciales perezosas: con `WRITE=false` el Bridge arranca sin `BRACKET_WRITE_USERNAME/PASSWORD`
+  (verificado en la pila aislada, sin esas variables). Con `WRITE=true` y sin credenciales responde
+  503 `bracket_write_not_configured` **sin leer ni escribir** (tests 7 y 8 de `test_p25b.py`).
 - Doble cerrojo del primer release: `BRACKET_RESULT_WRITE_ENABLED=false` **y** credenciales de
   escritura ausentes (§9). Con cualquiera de los dos, no hay PUT posible.
 - Habilitación futura (fase separada, fuera de este plan): cambiar la variable a `true`, añadir las
@@ -556,3 +530,88 @@ No se modifica ningún documento de runtime ni de operación.
 - Commit único, solo documentación: `docs(release): plan tatami 1 production rollout`
 - Push a `develop` por el remote HTTPS existente.
 - Sin `amend`, sin `force-push`, sin tocar `main`, sin mover submódulos.
+
+---
+
+## 19. EVIDENCIA DE LA VALIDACIÓN P2.5B (2026-10-02)
+
+Esta sección registra lo **realmente ejecutado** al preparar los artefactos. Nada de esto se desplegó.
+
+### 19.1 Imágenes release construidas (locales, no publicadas)
+
+| Imagen | Image ID | Arq | Usuario | Puerto | Healthcheck | Tamaño |
+| --- | --- | --- | --- | --- | --- | --- |
+| `danyseve1/bracket-bjj:47bc129-r3` | `sha256:59944e01606c1e7db4f1e06b9476313db82b804f883ae1cbaa749653ae93743b` | arm64 | `bracket` | 8400 | `wget /api/ping` | 331 MB |
+| `bjj-bridge-api:p2.5b-test` | `sha256:c2080cc69aad4daa1bca125b06579e33de90428346d1a8e0e01f5907af0bcc02` | arm64 | `bridge` | 8500 | `python /health` | 195 MB |
+| `bjj-scoreboard:p2.5b-test` | `sha256:5b1a2a5fd2380688c5c1d74608486e0344f4ab2dcee37b61a3869aaf084011c8` | arm64 | `node` | 3000 | `node /health` (integrado) o `/` (standalone) | 264 MB |
+
+Bracket conserva las etiquetas del build reproducible (`revision=47bc129…`, `recipe_revision=r3`,
+base `python:3.14-alpine3.22`). Bridge: `WORKDIR=/app`, sin `pytest/mypy/ruff` dentro, 0 ficheros
+world-writable bajo `/app`, 0 referencias a marcadores de secreto en el historial de capas.
+`BRACKET_RESULT_WRITE_ENABLED` viaja a `false` por defecto y no hay credenciales de escritura en la imagen.
+**Ninguna imagen se ha publicado**: los digests de release se capturarán en P2.5C.
+
+### 19.2 Pila aislada de punta a punta (no productiva)
+
+Red `bjj-p25b-dbg` (172.32.0.0/24) + volumen `bjj-p25b-dbgpg` propios; puertos 18400 (Bracket),
+13001 (scoreboard) y 18500 (Bridge) ligados solo a 127.0.0.1; PostgreSQL temporal con esquema en
+Alembic `c1ab44651e79 (head)`, idéntico al productivo; datos sintéticos (sin datos de personas).
+Resultado (`SCRIPT_RC=0`):
+
+1. salud: Bracket `/api/ping` → `"ping"`; scoreboard `{"status":"ok","mode":"integrated","state_store":{"enabled":true,"ready":true}}`; Bridge `{"status":"ok","version":"0.1.0"}`.
+2. candidatos: `GET /tatamis/1/candidates?tournament_id=1` → **200**, `count=6`, `scoreboard_read=true`.
+3. UI integrada servida por el adapter → **200**, HTML real (1319 bytes).
+4. asignación: `POST /tatamis/1/assign-match` → **201**, `match_id=9007`.
+5. combate cerrado: `status=finished`, `points_a=2`, `points_b=1`, ganador `101`, `method=points`, `revision=5`.
+6. **WRITE desactivado**: `POST /tatamis/1/result` → **503** con `{"status":"failed","reason":"result_write_disabled"}` y ningún dato de combate en el cuerpo; el reenvío vuelve a dar **503**.
+7. persistencia: reinicio real del contenedor del scoreboard → `state.json` (0600) releído y estado idéntico (`match_id`, `session_id`, `status`, `revision`).
+8. idempotencia: reasignar el mismo combate → **200** conservando sesión, estado y revisión; asignar **otro** combate → **409** sin tocar el estado.
+9. cierre: `clear_match` aceptado (revisión 6, estado `null`); el reintento del mismo comando se **rechaza** (`wrong_session`, la memoria de idempotencia desaparece con la sesión) y el estado sigue `null`; los candidatos vuelven a incluir el combate.
+10. **cero publicación**: la fila del combate 9007 en el Bracket sigue con `puntos 0-0` y `start_time=NULL` mientras el scoreboard cerró 2-1; 0 escrituras (`PUT matches` / `POST token`) vistas por el Bracket.
+11. teardown limpio: 0 contenedores, 0 redes y 0 volúmenes `bjj-p25b*`; las imágenes de prueba se conservan.
+
+### 19.3 Hallazgo de la fase: 500 del Bracket con columnas de duración nulas
+
+El primer intento del E2E aislado falló con `GET /tatamis/1/candidates` → **502**. Diagnóstico: el
+Bracket devolvía **500** en `GET /api/tournaments/1/stages?no_draft_rounds=true` por un error de
+validación de la respuesta (`duration_minutes` y `margin_minutes` = `None` en `matches`), y el Bridge
+traducía el 5xx del upstream a 502 — comportamiento correcto. La causa estaba en el **fixture** de
+pruebas heredado de P2.4C.1, que inserta `matches` sin `duration_minutes`/`margin_minutes` (columnas
+no nulas en el modelo de respuesta) para ejercitar escenarios SQL de DEF-02. Red, DNS, puerto y prefijo
+`/api` eran correctos (verificado: resolución del nombre, TCP a 8400, `/api/ping` a través del Bridge).
+
+Corrección aplicada **solo al harness aislado** (el código de producto no se tocó): el script de la
+pila rellena esas dos columnas con `COALESCE` antes del E2E. Comprobación de impacto real: en la base
+de producción, `matches` tiene **0** filas con `duration_minutes` o `margin_minutes` nulos (7 combates),
+así que el release no puede provocar ese 500 con los datos actuales.
+
+### 19.4 Suite de tests reejecutada
+
+- `pytest bridge-api/tests`: **225 passed**, 1 aviso (`class Config` deprecado de pydantic-settings).
+- `node --test scoreboard-adapter/tests/*.test.js` (con `NODE_PATH` a los `node_modules` del cache):
+  **128 tests, 128 passed, 0 fail**.
+- `docker compose config` sin perfil: `bracket`, `bracket-postgres`, `nginx`, `wireguard`.
+- `docker compose config --profile tatami1`: los 4 anteriores + `bridge-api` + `scoreboard-tatami-1`.
+- Puertos publicados al host en los servicios del perfil `tatami1`: **ninguno**.
+- Variables obligatorias (`:?`) en el Compose: `BRACKET_API_URL`, `SCOREBOARD_TATAMI_1_URL`,
+  `SCOREBOARD_CONTROL_TOKEN`, `SCOREBOARD_INTERNAL_TOKEN`, `BRACKET_RESULT_WRITE_ENABLED`.
+- `git diff --check`: sin problemas.
+
+### 19.5 Producción (antes y después, sin cambios)
+
+| Contenedor | ID | StartedAt (UTC) | restarts |
+| --- | --- | --- | --- |
+| `bracket` | `d5e9e340ac454707ebe1cc182bee00d35562505ce05a481d03aab96a41ecf165` | 2026-10-01T18:43:48Z | 0 |
+| `bracket-postgres` | `0283c07f4d4b48b46579465ad399d6e60e8d902063b8cee215c292bd9ad615e8` | 2026-10-01T15:03:21Z | 0 |
+| `bjj-nginx` | `4d8d8390fcab8e92708d174731cd458d0a60111dffe288ba4e28b17775fa984e` | 2026-10-01T15:03:21Z | 0 |
+| `wireguard` | `c749d6966735416cf1a11aca975f134a08e799fc3a0925d872fbf6bd4a10d87e` | 2026-10-01T15:03:21Z | 0 |
+
+El Bracket productivo sigue ejecutando la imagen por digest `sha256:e07ec8b4…8df8` con etiqueta
+`revision=e6abd7d…`. No se ejecutó `docker compose up`, ni `pull`, ni se tocó `.env`, nginx, WireGuard
+ni PostgreSQL.
+
+### 19.6 Git
+
+Commit `feat(release): prepare tatami 1 deployment artifacts` sobre `develop`
+(HEAD previo `331f03b…`, el commit de P2.5A) con los artefactos y la documentación de esta fase.
+Sin `amend`, sin `force-push`, sin tocar `main`, sin mover submódulos.

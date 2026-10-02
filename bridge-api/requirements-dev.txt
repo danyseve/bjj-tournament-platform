@@ -1,2 +1,6 @@
 -r requirements.txt
-pytest
+
+# Test tooling only (P2.5B): pinned like the runtime, and never installed into the
+# release image. Async tests run through the anyio pytest plugin, which anyio
+# already ships with (it is a runtime dependency of FastAPI/Starlette).
+pytest==9.1.1

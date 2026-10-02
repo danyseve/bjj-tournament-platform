@@ -5,11 +5,12 @@ from fastapi import FastAPI, HTTPException, Response
 from app.bracket_client import (BracketClient, BracketError, cas_view, collect_candidates,
                                 locate_match, match_baseline, match_write_body, normalize_match,
                                 positive_int, post_verify)
+from app.config import settings
 from app.models import (AssignMatchRequest, AssignMatchResponse, CandidatesResponse,
                         MatchCandidate, ResultRequest, ResultResponse, ResultStatus)
 from app.result_gate import (CONFLICT, FAILED, PENDING, REASON_ALREADY_WRITTEN,
                              REASON_BRACKET_CHANGED, REASON_NOT_PRISTINE, REASON_PARTICIPANTS,
-                             REASON_WRITE_NOT_CONFIGURED, evaluate)
+                             REASON_WRITE_DISABLED, REASON_WRITE_NOT_CONFIGURED, evaluate)
 from app.result_store import FAILED as STORE_FAILED
 from app.result_store import WRITING as STORE_WRITING
 from app.result_store import WRITTEN as STORE_WRITTEN
@@ -158,6 +159,13 @@ async def submit_result(tatami_id: int, payload: ResultRequest, response: Respon
     """
     if tatami_id != 1:
         raise HTTPException(status_code=400, detail="Only tatami_id 1 is supported")
+    # P2.5B — release gate. With the switch off this endpoint answers before doing
+    # anything else at all: no scoreboard read, no Bracket token, no GET, no PUT,
+    # no publication logic. The default is off, so a deployment that forgets to
+    # set it publishes nothing rather than everything.
+    if not settings.bracket_result_write_enabled:
+        response.status_code = 503
+        return ResultResponse(status=FAILED, reason=REASON_WRITE_DISABLED)
     if not bracket_client.write_configured:
         response.status_code = 503
         return ResultResponse(status=FAILED, reason=REASON_WRITE_NOT_CONFIGURED)

@@ -39,6 +39,19 @@ La escritura de resultados hacia Bracket sigue **desactivada por diseño**: el p
 modo lectura (`BRACKET_RESULT_WRITE_ENABLED=false`, requisito previo a implementar) y sin credenciales
 de escritura.
 
+## Prerrequisitos de release del Tatami 1 — P2.5B (artefactos listos, sin desplegar)
+
+Implementados los prerrequisitos técnicos del plan `docs/10-plan-release-tatami1.md` sin desplegar nada:
+flag `BRACKET_RESULT_WRITE_ENABLED` (por defecto `false`, fail-closed: `POST /tatamis/1/result`
+responde 503 `result_write_disabled` sin leer el scoreboard ni llamar a Bracket), dependencias del
+Bridge con versiones exactas, Dockerfile release (base por digest, no-root, healthcheck), healthcheck
+real del scoreboard (`GET /health` en modo integrado), imágenes release de Bracket (`47bc129-r3`),
+Bridge y scoreboard construidas y verificadas, y target de Compose `--profile tatami1` (servicios
+nuevos sin publicar al host). Validación de punta a punta en una pila aislada con PostgreSQL temporal,
+incluido el reinicio real del scoreboard (persistencia) y la comprobación de **cero** publicación de
+resultados en Bracket. Evidencia en §19 de `docs/10-plan-release-tatami1.md`. Producción intacta;
+commit `feat(release): prepare tatami 1 deployment artifacts`.
+
 ## Plan de fases de producto (referencia; no describe lo ya desplegado)
 
 Las fases siguientes conservan el plan original. Su numeración no equivale a los gates operativos P0/P1/P2.
