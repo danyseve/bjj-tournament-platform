@@ -85,7 +85,7 @@ Ejecutado por el operador en la UI (una sola vez, "Etapa siguiente"). Verificado
 - Comportamiento del scheduler (verificado en código y en los datos): es **global por torneo**.
   Recorre **todos** los stages del torneo y asigna `courts[min(i, len(courts)-1)]`. Con un único
   court, **todos** los combates de todas las categorías se secuencian en **Tatami 1**.
-- Evidencia medida tras la acción (26 combinaciones posibles de 6 categorías):
+- Evidencia medida tras la acción (los 26 combates de las 6 categorías):
   - 26/26 matches con `court_id = 8` (un único court distinto);
   - `position_in_schedule` = **0..25**, 26 posiciones distintas;
   - `start_time` presente en los 26: `2026-10-17 09:00 → 11:30 UTC`;
