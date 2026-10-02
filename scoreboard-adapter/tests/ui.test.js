@@ -262,3 +262,110 @@ test('UI16 el control refleja el status del servidor y no admite retrocesos',asy
  assert.equal(presentation(p).time,'02:00','un snapshot antiguo no reanuda la presentacion');
  assert.equal(presentation(p).mode.includes('paused'),true);
 });
+
+const select=(p,id,value)=>{const n=p.doc.querySelector('#'+id);n.value=value;n.dispatchEvent(new p.w.Event('change',{bubbles:true}));};
+const sides=(a={},b={})=>snapshot({fighter_a:{name:'Ana',team_id:101,points:0,advantages:0,penalties:0,...a},
+ fighter_b:{name:'Bea',team_id:102,points:0,advantages:0,penalties:0,...b}});
+const armed=p=>p.doc.querySelector('#finish-confirm').style.display!=='none';
+
+test('UI17 las paginas de control ofrecen ganador y metodo y la pantalla / no construye el panel',async t=>{
+ const {url}=await running(t);
+ for(const route of ['/control','/control2']) {
+  const p=await page(url,route);
+  assert.ok(p.doc.querySelector('#integrated-finish'),route+' construye el panel de finalizacion');
+  const winner=p.doc.querySelector('#finish-winner'),method=p.doc.querySelector('#finish-method');
+  assert.deepEqual([...method.options].slice(1).map(o=>o.value),require('../state').METHODS,route+' enum completo de metodos');
+  assert.equal(method.options[0].value,'','sin metodo por defecto');
+  assert.equal(p.doc.querySelector('#finish-open').disabled,true,route+' sin sesion no se puede finalizar');
+  assert.equal(winner.options.length,1,'sin sesion no hay luchadores');
+  p.handlers['tatami:state'](sides());
+  assert.deepEqual([...winner.options].slice(1).map(o=>o.value),['101','102']);
+  assert.match(winner.options[1].textContent,/A · Ana/);
+  assert.match(winner.options[2].textContent,/B · Bea/);
+  assert.equal(p.doc.querySelector('#finish-open').disabled,true,'sin ganador ni metodo no se puede armar');
+  select(p,'finish-winner','101');select(p,'finish-method','decision');
+  assert.equal(p.doc.querySelector('#finish-open').disabled,false);
+  assert.equal(armed(p),false,'armado solo tras pulsar finalizar');
+ }
+ const read=await page(url,'/');
+ assert.equal(read.doc.querySelector('#integrated-finish'),null,'/ no construye el panel');
+ assert.equal(read.doc.querySelector('#finish-open'),null);
+});
+
+test('UI18 finalizar exige confirmacion explicita y emite un unico comando canonico',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state'](sides());
+ click(p,'finish-open');
+ assert.deepEqual(p.emits,[],'sin ganador ni metodo no se emite nada');
+ assert.equal(armed(p),false);
+ select(p,'finish-winner','102');select(p,'finish-method','submission');
+ click(p,'finish-open');
+ assert.deepEqual(p.emits,[],'armar nunca emite');
+ assert.equal(armed(p),true);
+ assert.match(p.doc.querySelector('#finish-ask').textContent,/Bea/);
+ assert.match(p.doc.querySelector('#finish-ask').textContent,/Sumisión/);
+ click(p,'finish-cancel');
+ assert.deepEqual(p.emits,[]);assert.equal(armed(p),false,'cancelar desarma sin emitir');
+ click(p,'finish-open');click(p,'finish-confirm');
+ assert.equal(p.emits.length,1,'un unico comando al confirmar');
+ const [event,payload]=p.emits[0];
+ assert.equal(event,'tatami:update');assert.equal(payload.operation,'finish');
+ assert.equal(payload.winner_team_id,102);assert.equal(payload.method,'submission');
+ assert.equal(payload.session_id,'synthetic-session-a');assert.equal(payload.expected_revision,1);
+ assert.equal(payload.tatami_id,1);assert.equal(payload.match_id,400);
+ assert.deepEqual(Object.keys(payload).sort(),['command_id','expected_revision','match_id','method','operation','session_id','tatami_id','winner_team_id'],'sin campos desconocidos');
+ click(p,'finish-confirm');
+ assert.equal(p.emits.length,1,'un segundo clic no reemite');
+});
+
+test('UI19 tras finalizar los controles de mutacion quedan bloqueados y no emiten',async t=>{
+ const {url}=await running(t);
+ for(const route of ['/control','/control2']) {
+  const p=await page(url,route);
+  p.handlers['tatami:state'](sides({points:4},{points:2}));
+  for(const id of ['add4f1','add2f2','start','restart'])assert.equal(p.doc.querySelector('#'+id).disabled,false,route+' '+id+' habilitado con combate vivo');
+  p.handlers['tatami:state']({...sides({points:4},{points:2}),revision:7,status:'finished',remaining_seconds:298,winner_team_id:101,method:'points'});
+  for(const id of ['add4f1','sub2f1','addadvf2','start','restart']) {
+   const n=p.doc.querySelector('#'+id);if(n===null)continue;
+   // Los controles de icono son <i>: el bloqueo efectivo es aria-disabled.
+   if(n.matches('input,button'))assert.equal(n.disabled,true,route+' '+id+' bloqueado tras finalizar');
+   assert.equal(n.getAttribute('aria-disabled'),'true',route+' '+id);
+  }
+  assert.equal(p.doc.querySelector('#finish-open').disabled,true);
+  assert.equal(p.doc.querySelector('#finish-winner').disabled,true);
+  assert.equal(p.doc.querySelector('#finish-method').disabled,true);
+  assert.match(p.doc.querySelector('#finish-ask').textContent,/Finalizado/);
+  assert.match(p.doc.querySelector('#finish-ask').textContent,/Ana/);
+  assert.match(p.doc.querySelector('#finish-ask').textContent,/Puntos/);
+  assert.match(p.doc.querySelector('#integrated-result').textContent,/Finalizado/);
+  assert.equal(presentation(p).time,'04:58');
+  assert.match(presentation(p).mode,/finished/);
+  p.emits.length=0;
+  for(const id of ['add4f1','add2f2','start','restart'])click(p,id);
+  assert.deepEqual(p.emits,[],route+' ninguna mutacion tras finalizar');
+ }
+});
+
+test('UI20 la pantalla / refleja el resultado final y sigue siendo solo lectura',async t=>{
+ const {url}=await running(t),p=await page(url,'/');
+ assert.equal(p.doc.querySelector('#integrated-finish'),null);
+ p.handlers['tatami:state']({...sides({points:2},{points:4,advantages:1}),revision:5,status:'finished',remaining_seconds:0,winner_team_id:102,method:'submission'});
+ const banner=p.doc.querySelector('#integrated-result');
+ assert.match(banner.textContent,/Finalizado/);assert.match(banner.textContent,/Bea/);assert.match(banner.textContent,/Sumisión/);
+ assert.deepEqual(presentation(p).names,['Ana','Bea']);
+ assert.equal(presentation(p).time,'00:00');
+ assert.match(presentation(p).mode,/finished/);
+ for(const n of p.doc.querySelectorAll('input,button,#start,#restart,[id^="add"],[id^="sub"]')) {
+  assert.equal(n.getAttribute('aria-disabled'),'true');
+  assert.equal(n.getAttribute('tabindex'),'-1');
+  if(n.matches('input,button'))assert.equal(n.disabled,true);
+  n.dispatchEvent(new p.w.Event('click',{bubbles:true}));
+ }
+ assert.deepEqual(p.emits,[]);
+ p.handlers['tatami:state']({...sides(),revision:9,status:'running',remaining_seconds:200});
+ assert.match(presentation(p).mode,/finished/,'un snapshot posterior no resucita el combate');
+ assert.match(p.doc.querySelector('#integrated-result').textContent,/Finalizado/);
+ p.handlers['tatami:state']({...sides({name:'New A'},{name:'New B'}),session_id:'synthetic-session-b',revision:1,status:'ready',remaining_seconds:300});
+ assert.equal(p.doc.querySelector('#integrated-result').textContent,'','una sesion nueva limpia el resultado');
+ assert.equal(presentation(p).time,'05:00');
+});

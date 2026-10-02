@@ -2,7 +2,7 @@
 
 Wrapper del repositorio principal; no modifica el submódulo. Documenta el
 contrato integrado de Tatami 1: el Bridge lo alimenta por la API interna y el
-servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.3E).
+servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.3F).
 
 ## Modos y límite de seguridad
 
@@ -129,6 +129,37 @@ como fuente temporal, no se admiten valores negativos y al llegar a 0 el estado
 pasa a `finished` con `remaining_seconds = 0`. No hay persistencia: reiniciar el
 proceso pierde el estado.
 
+## Finalización local (P2.3F)
+
+`finish` finaliza el combate **solo en memoria**: el resultado no se persiste en
+disco ni en base de datos y no se escribe nada en Bracket. No hay recuperación
+tras reiniciar el proceso.
+
+Payload: los campos base (`session_id`, `command_id`, `expected_revision`,
+`tatami_id`, `match_id`, `operation`) más `winner_team_id` y `method`, sin campos
+extra. `winner_team_id` debe ser el `team_id` de uno de los dos luchadores
+asignados (`invalid_winner` en caso contrario). `method` debe pertenecer al enum
+**propio del dominio BJJ local** — `points`, `submission`, `decision`,
+`disqualification`, `walkover`, `referee_stoppage`, `other` — que todavía **no se
+traduce al modelo de Bracket** (`invalid_method` en caso contrario).
+
+Al aceptar: el reloj se congela en el valor calculado en ese instante, `status`
+pasa a `finished`, se registran ganador y método, se conserva el scoring final y
+`session_id`, `revision` sube exactamente una vez y se emite el snapshot completo.
+Un combate `finished` queda congelado: `score_delta`, `set_running`, `reset` y un
+`finish` distinto se rechazan con `already_finished` sin mutar nada, y solo el
+replay del mismo `command_id` devuelve el ack original. Un combate agotado por
+reloj también termina `finished` (sin ganador registrado) y queda igualmente
+congelado: registrar un ganador a posteriori **no** está implementado (ver
+*Próximos pasos*).
+
+En `/control` y `/control2` hay un panel mínimo de finalización: seleccionar
+ganador y método, pulsar *Finalizar…* y confirmar en un segundo paso explícito
+(armar nunca emite). Tras finalizar, los controles de puntuación y reloj quedan
+bloqueados —y sus manejadores comprueban la autorización, no solo el aspecto— y
+se muestra el resultado. La pantalla `/` refleja el resultado final y sigue sin
+construir ningún control.
+
 ## Control autorizado
 
 `tatami:update` exige credencial de control: `SCOREBOARD_CONTROL_TOKEN` (entorno,
@@ -189,6 +220,15 @@ Después de pasar tests, build manual con contexto raíz:
 ```sh
 docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3e-test .
 ```
+
+## Próximos pasos (no implementados)
+
+- Liberar o cargar el siguiente combate: la asignación de otro match sigue
+  bloqueada por el `409` de la instancia y no existe todavía una operación
+  explícita para liberar la sesión ni para decidir el ganador de un combate
+  agotado por reloj.
+- Persistencia y recuperación tras reinicio del proceso.
+- Mapeo del enum de métodos y del resultado hacia el modelo de Bracket.
 
 Solo los cuatro archivos JS del adapter entran en el contexto/runtime de la imagen;
 tests, docs y scripts de validación no se copian. El smoke test Python stdlib

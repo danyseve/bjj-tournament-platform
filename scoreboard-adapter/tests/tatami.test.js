@@ -138,7 +138,12 @@ test('20 payloads invalidos, operaciones y campos desconocidos son rechazados', 
  const s = assigned(), before = s.snapshot();
  const cases = [
   [null, 'invalid_command'], ['x', 'invalid_command'], [[], 'invalid_command'],
-  [{...base(before), operation: 'finish'}, 'invalid_operation'],
+  [{...base(before), operation: 'finish'}, 'invalid_command'],
+  [{...base(before), operation: 'finish', winner_team_id: 101}, 'invalid_command'],
+  [{...base(before), operation: 'finish', method: 'points', extra: 1}, 'invalid_command'],
+  [{...base(before), operation: 'finish', winner_team_id: '101', method: 'points'}, 'invalid_winner'],
+  [{...base(before), operation: 'finish', winner_team_id: 999, method: 'points'}, 'invalid_winner'],
+  [{...base(before), operation: 'finish', winner_team_id: 101, method: 'ko'}, 'invalid_method'],
   [{...base(before), operation: 'score_delta', fighter: 'a', field: 'points'}, 'invalid_command'],
   [{...base(before), operation: 'score_delta', fighter: 'a', field: 'points', delta: 2, extra: 1}, 'invalid_command'],
   [{...base(before), operation: 'reset', extra: true}, 'invalid_command'],
@@ -166,7 +171,7 @@ test('21 acumulaciones absurdas y arranque tras finalizar son rechazados', () =>
  assert.equal(overflow.ok, false); assert.equal(overflow.code, 'invalid_operation'); assert.equal(s.snapshot().fighter_a.points, 1000);
  running(s, true); clock.value += 300000; assert.equal(s.snapshot().status, 'finished');
  const resume = running(s, true);
- assert.equal(resume.ok, false); assert.equal(resume.code, 'invalid_operation'); assert.equal(s.snapshot().status, 'finished');
+ assert.equal(resume.ok, false); assert.equal(resume.code, 'already_finished'); assert.equal(s.snapshot().status, 'finished');
 });
 async function server(t) {
  const a = require('../integrated').createServer(legacyRoot);
@@ -246,10 +251,174 @@ test('25 el reloj corre en el servidor y se emite a los clientes conectados', as
 });
 test('26 el marcador canonico no escribe resultados ni llama a Bracket', () => {
  // Guard test: no outbound call and no result endpoint exist in the scoreboard.
- const source = require('node:fs').readFileSync(path.join(__dirname, '../integrated.js'), 'utf8');
- for (const outbound of ['fetch(', 'axios', 'http.request', 'https.request', 'undici', 'got(']) {
-  assert.ok(source.includes(outbound) === false, 'sin llamada saliente: ' + outbound);
+ // The winner is recorded in memory only (state.js); no adapter file may talk to
+ // Bracket or to any other service.
+ for (const file of ['../integrated.js', '../state.js', '../integrated-ui.js', '../launcher.js']) {
+  const source = require('node:fs').readFileSync(path.join(__dirname, file), 'utf8');
+  for (const outbound of ['fetch(', 'axios', 'http.request', 'https.request', 'undici', 'got(']) {
+   assert.ok(source.includes(outbound) === false, file + ' sin llamada saliente: ' + outbound);
+  }
+  assert.ok(/['"]\/result/.test(source) === false, file + ' no expone ningun endpoint de resultados');
+  // Sin destino de red no puede haber escritura en Bracket: ni URL, ni ruta de
+  // su API, ni cliente HTTP (lo anterior). Las menciones en comentarios no son
+  // alcance: aqui se comprueba que no exista ningun destino.
+  assert.ok(/https?:\/\//.test(source) === false, file + ' sin URL de red');
+  assert.ok(source.includes('/api/') === false, file + ' sin ruta de la API de Bracket');
  }
- assert.ok(/['"]\/result/.test(source) === false, 'no se expone ningun endpoint de resultados');
- assert.ok(/\bwinner_team_id\s*=/.test(source) === false, 'el marcador nunca asigna ganador');
+});
+
+const finish = (s, winner, method) => s.apply({...base(s.snapshot()), operation: 'finish', winner_team_id: winner, method});
+const finalState = (s, winner, method) => {const r = finish(s, winner, method); assert.equal(r.ok, true, JSON.stringify(r)); return s.snapshot();};
+
+test('27 finish valido del luchador A congela el combate y sube revision una vez', () => {
+ const s = assigned(); const session = s.snapshot().session_id;
+ score(s, 'a', 'points', 4); score(s, 'a', 'advantages', 1); score(s, 'b', 'penalties', 2);
+ const revision = s.snapshot().revision, r = finish(s, 101, 'submission');
+ assert.equal(r.ok, true); assert.equal(r.changed, true); assert.equal(r.revision, revision + 1);
+ const state = s.snapshot();
+ assert.equal(state.status, 'finished'); assert.equal(state.winner_team_id, 101); assert.equal(state.method, 'submission');
+ assert.equal(state.revision, revision + 1); assert.equal(state.session_id, session);
+ assert.equal(state.revision, revision + 1, 'la revision sube exactamente una vez');
+ assert.deepEqual([state.fighter_a.points, state.fighter_a.advantages, state.fighter_b.penalties], [4, 1, 2]);
+});
+
+test('28 finish valido del luchador B por decision', () => {
+ const s = assigned(); const state = finalState(s, 102, 'decision');
+ assert.equal(state.winner_team_id, 102); assert.equal(state.method, 'decision'); assert.equal(state.status, 'finished');
+});
+
+test('29 un ganador que no participa en el combate es rechazado sin mutar', () => {
+ const s = assigned(); const before = s.snapshot();
+ for (const winner of [1, 999, 0, -101, '101', null, 101.5, true]) {
+  const r = finish(s, winner, 'points');
+  assert.equal(r.ok, false, String(winner)); assert.equal(r.code, 'invalid_winner', String(winner));
+ }
+ assert.deepEqual(s.snapshot(), before);
+});
+
+test('30 el metodo de finalizacion debe pertenecer al enum explicito', () => {
+ const s = assigned(); const before = s.snapshot();
+ for (const method of ['SUB', 'submission ', 'ko', '', 7, null, 'other ', 'submision']) {
+  const r = finish(s, 101, method);
+  assert.equal(r.ok, false, String(method)); assert.equal(r.code, 'invalid_method', String(method));
+ }
+ assert.deepEqual(s.snapshot(), before);
+ for (const method of require('../state').METHODS) {
+  assert.equal(finalState(assigned(), 101, method).method, method, method);
+ }
+});
+
+test('31 finish con revision obsoleta es rechazado devolviendo la actual', () => {
+ const s = assigned(); score(s, 'a', 'points', 2); const before = s.snapshot();
+ for (const expected of [before.revision - 1, before.revision + 1, 0]) {
+  const r = s.apply({...base(before), expected_revision: expected, operation: 'finish', winner_team_id: 101, method: 'points'});
+  assert.equal(r.ok, false); assert.equal(r.code, 'stale_revision'); assert.equal(r.revision, before.revision);
+ }
+ assert.deepEqual(s.snapshot(), before);
+});
+
+test('32 finish con sesion incorrecta es rechazado sin mutar', () => {
+ const s = assigned(); const before = s.snapshot();
+ const r = s.apply({...base(before), session_id: 'synthetic-session-other', operation: 'finish', winner_team_id: 101, method: 'points'});
+ assert.equal(r.ok, false); assert.equal(r.code, 'wrong_session'); assert.deepEqual(s.snapshot(), before);
+});
+
+test('33 finish con combate incorrecto es rechazado sin mutar', () => {
+ const s = assigned(); const before = s.snapshot();
+ const r = s.apply({...base(before), match_id: before.match_id + 1, operation: 'finish', winner_team_id: 101, method: 'points'});
+ assert.equal(r.ok, false); assert.equal(r.code, 'wrong_match'); assert.deepEqual(s.snapshot(), before);
+});
+
+test('34 finish congela el reloj en el valor actual', () => {
+ const s = assigned(); running(s, true); clock.value += 5000;
+ assert.equal(s.snapshot().remaining_seconds, 295);
+ const state = finalState(s, 101, 'points');
+ assert.equal(state.remaining_seconds, 295); assert.equal(state.status, 'finished');
+ clock.value += 120000;
+ assert.equal(s.snapshot().remaining_seconds, 295, 'el reloj de un combate finalizado no avanza');
+ assert.equal(s.running(), false, 'el reloj autoritativo queda parado');
+});
+
+test('35 finish desde ready congela la duracion completa', () => {
+ const s = assigned(); const state = finalState(s, 102, 'walkover');
+ assert.equal(state.remaining_seconds, 300); assert.equal(state.method, 'walkover');
+});
+
+test('36 el replay del mismo finish no duplica ni sube revision', () => {
+ const s = assigned();
+ const command = {...base(s.snapshot()), operation: 'finish', winner_team_id: 101, method: 'points'};
+ const first = s.apply(command); const frozen = s.snapshot();
+ const replay = s.apply({...command});
+ assert.equal(replay.ok, true); assert.equal(replay.changed, false); assert.equal(replay.revision, first.revision);
+ assert.deepEqual(s.snapshot(), frozen);
+});
+
+test('37 un segundo finish distinto es rechazado y no altera el resultado congelado', () => {
+ const s = assigned(); const frozen = finalState(s, 101, 'points');
+ for (const [winner, method] of [[102, 'submission'], [101, 'decision']]) {
+  const r = finish(s, winner, method);
+  assert.equal(r.ok, false); assert.equal(r.code, 'already_finished'); assert.equal(r.revision, frozen.revision);
+ }
+ assert.deepEqual(s.snapshot(), frozen);
+});
+
+test('38 tras finalizar el scoring, el reloj y el reset son rechazados', () => {
+ const s = assigned(); score(s, 'a', 'points', 2); const frozen = finalState(s, 101, 'submission');
+ const rejected = [score(s, 'a', 'points', 2), score(s, 'b', 'advantages', 1), score(s, 'b', 'penalties', -1),
+  running(s, true), running(s, false), s.apply({...base(frozen), operation: 'reset'})];
+ for (const r of rejected) {assert.equal(r.ok, false, JSON.stringify(r)); assert.equal(r.code, 'already_finished');}
+ assert.deepEqual(s.snapshot(), frozen);
+});
+
+test('39 un combate acabado por reloj queda congelado y sin ganador registrado', () => {
+ const s = assigned(); running(s, true); clock.value += 300000;
+ const expired = s.snapshot();
+ assert.equal(expired.status, 'finished'); assert.equal(expired.winner_team_id, null); assert.equal(expired.method, null);
+ const r = finish(s, 101, 'points');
+ assert.equal(r.ok, false); assert.equal(r.code, 'already_finished');
+ assert.deepEqual(s.snapshot(), expired, 'el resultado no se puede reescribir tras expirar el reloj');
+});
+
+test('40 el enum de metodos del cliente coincide con el del servidor', () => {
+ const {METHODS} = require('../state');
+ const source = require('node:fs').readFileSync(path.join(__dirname, '../integrated-ui.js'), 'utf8');
+ const match = /const METHODS = (\[[^\]]*\]);/.exec(source);
+ assert.ok(match !== null, 'el cliente declara el enum de metodos');
+ assert.deepEqual(JSON.parse(match[1].replace(/'/g, '"')), METHODS);
+});
+
+test('41 finish por socket emite el snapshot final y el ticker no lo modifica', async t => {
+ const {url} = await server(t), state = await assign(url);
+ const controller = await connect(url, cookie(CONTROL)), display = await connect(url);
+ await controller.poll(); await display.poll();
+ await controller.send('tatami:update', {...base(state), operation: 'set_running', running: true}, 1);
+ assert.equal(acks(await controller.poll()).get(1).ok, true);
+ const command = {...base({...state, revision: state.revision + 1}), operation: 'finish', winner_team_id: 102, method: 'referee_stoppage'};
+ await controller.send('tatami:update', command, 2);
+ assert.deepEqual(acks(await controller.poll()).get(2), {ok: true, command_id: command.command_id, revision: state.revision + 2});
+ const packets = await display.poll();
+ const final = events(packets).map(payload => payload[1]).filter(snapshot => snapshot.status === 'finished').pop();
+ assert.ok(final, 'el snapshot final llega a los clientes conectados');
+ assert.equal(final.winner_team_id, 102); assert.equal(final.method, 'referee_stoppage');
+ assert.equal(final.remaining_seconds, 300, 'el reloj se congela en el valor observable al finalizar');
+ // El ticker ya no corre: ningún snapshot posterior.
+ await assert.rejects(controller.poll(), error => error.name === 'TimeoutError');
+ await assert.rejects(display.poll(), error => error.name === 'TimeoutError');
+ const internal = (await (await fetch(url + '/internal/tatamis/1/state', {headers: {'x-internal-token': INTERNAL}})).json()).state;
+ assert.deepEqual(internal, final, 'el estado interno es exactamente el snapshot emitido');
+ await controller.close(); await display.close();
+});
+
+test('42 una UI que se reconecta tras finalizar recibe el resultado final congelado', async t => {
+ const {url} = await server(t), state = await assign(url);
+ const controller = await connect(url, cookie(CONTROL));
+ await controller.poll();
+ const command = {...base(state), operation: 'finish', winner_team_id: 101, method: 'other'};
+ await controller.send('tatami:update', command, 1);
+ await controller.poll();
+ const later = await connect(url), snapshot = events(await later.poll()).find(([event]) => event === 'tatami:state')[1];
+ assert.equal(snapshot.status, 'finished'); assert.equal(snapshot.winner_team_id, 101); assert.equal(snapshot.method, 'other');
+ assert.equal(snapshot.revision, 2); assert.equal(snapshot.session_id, state.session_id);
+ assert.equal(snapshot.remaining_seconds, 300); assert.equal(snapshot.fighter_a.points, 0);
+ await controller.close(); await later.close();
 });

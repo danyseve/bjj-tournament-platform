@@ -14,11 +14,15 @@ const COMMAND_HISTORY = 256;  // bounded idempotency memory per active session
 const MAX_DELTA = 100;        // absurd scoring jumps are refused, never clamped
 const MAX_FIELD_VALUE = 1000; // ceiling for any accumulator
 const FIELDS = ['points', 'advantages', 'penalties'];
+// Local BJJ domain enum for the finish method. It is intentionally not mapped to
+// the Bracket model yet: finalization stays in memory and nothing is persisted.
+const METHODS = ['points', 'submission', 'decision', 'disqualification', 'walkover', 'referee_stoppage', 'other'];
 const COMMAND_KEYS = ['session_id', 'command_id', 'expected_revision', 'tatami_id', 'match_id', 'operation'];
 const OPERATIONS = {
  score_delta: [...COMMAND_KEYS, 'fighter', 'field', 'delta'],
  set_running: [...COMMAND_KEYS, 'running'],
  reset: [...COMMAND_KEYS],
+ finish: [...COMMAND_KEYS, 'winner_team_id', 'method'],
 };
 function exact(value, keys) {
  return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -86,6 +90,9 @@ function createStore(options = {}) {
   const previous = commands.get(command.command_id);
   if (previous !== undefined) return {...previous};
   if (command.expected_revision !== active.revision) return refuse('stale_revision');
+  // A finished match is frozen: no scoring, clock, reset or second finish may
+  // touch it. Only a replay of an already accepted command answers (above).
+  if (active.status === 'finished') return refuse('already_finished');
   let changed = false;
   if (command.operation === 'score_delta') {
    if (command.fighter !== 'a' && command.fighter !== 'b') return refuse('invalid_operation');
@@ -113,6 +120,18 @@ function createStore(options = {}) {
     changed = true;
    }
    // Requesting the state the match is already in is an idempotent no-op.
+  } else if (command.operation === 'finish') {
+   if (command.winner_team_id !== active.fighter_a.team_id
+    && command.winner_team_id !== active.fighter_b.team_id) return refuse('invalid_winner');
+   if (METHODS.includes(command.method) === false) return refuse('invalid_method');
+   // Freeze the authoritative clock at the value observed right now, keep the
+   // final scoring and record the result in memory only.
+   active.remaining_seconds = remaining();
+   anchor = null;
+   active.status = 'finished';
+   active.winner_team_id = command.winner_team_id;
+   active.method = command.method;
+   changed = true;
   } else {
    anchor = null;
    active.remaining_seconds = active.duration_seconds;
@@ -148,4 +167,4 @@ function createStore(options = {}) {
   }
  };
 }
-module.exports = {createStore};
+module.exports = {createStore, METHODS};
