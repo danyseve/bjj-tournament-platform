@@ -18,10 +18,10 @@
       "date": "2026-10-02",
       "state": "Validated",
       "source": "bjj/quick-start.md",
-      "sha256": "30e1a645eb44",
+      "sha256": "cce9543d8166",
       "pdf": "quick-start-acceso-opsforge-v0.1.pdf",
       "pdf_pages": 3,
-      "pdf_bytes": 8831
+      "pdf_bytes": 8846
     },
     {
       "title": "Manual del Tatami / Árbitro",
@@ -30,10 +30,10 @@
       "date": "2026-10-02",
       "state": "Draft",
       "source": "bjj/tatami-arbitro.md",
-      "sha256": "7f9c30021b7a",
+      "sha256": "26f16f7e1028",
       "pdf": "manual-arbitro-tatami-v0.1.pdf",
       "pdf_pages": 5,
-      "pdf_bytes": 17349
+      "pdf_bytes": 17368
     },
     {
       "title": "Guía rápida — Árbitro Tatami",
@@ -70,5 +70,5 @@
       "pdf": null
     }
   ],
-  "built_from_commit": "1b1bc47"
+  "built_from_commit": "34d9be9"
 }
