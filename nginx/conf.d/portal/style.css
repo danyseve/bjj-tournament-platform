@@ -33,6 +33,17 @@ body {
   border-bottom: 2px solid var(--panel-borde);
 }
 
+/* Modelo de acceso: una linea discreta, sin detalle tecnico. */
+.pista {
+  display: inline-block;
+  margin: 10px 0 0;
+  padding: 3px 10px;
+  border: 1px solid var(--panel-borde);
+  border-radius: 999px;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
 .marca {
   margin: 0;
   font-size: 1.5rem;

@@ -74,6 +74,11 @@ Regla práctica: **el proyector siempre en `/`; el árbitro siempre en `/control
 Arriba a la izquierda, en ambos casos, hay una etiqueta de estado de la forma
 `Integrated · <estado> · Control|Read-only` que indica la pantalla y el estado del combate.
 
+Justo **debajo de esa etiqueta**, en las tres pantallas (`/`, `/control` y `/control2`), hay un
+enlace **`? Manual`** que abre este mismo manual en una **pestaña nueva**. Se abre aparte a
+propósito: así no se pierde el combate que estés operando. Es **solo navegación** —no toca el
+marcador, ni el reloj, ni el estado del combate— y no requiere volver al portal.
+
 ![Esquema de zonas de la pantalla de control](/assets/esquema-control.svg)
 
 *Esquema de zonas (no es una captura). Los números remiten a las secciones siguientes
@@ -299,11 +304,13 @@ Se marca de forma explícita para que nadie lo busque en la aplicación:
    el cuadro del torneo ni en Bracket.
 2. **Roles internos de árbitro.** No hay usuarios ni permisos dentro de la aplicación: quien
    entra en `/control` puede operar. La única barrera es Cloudflare Access.
-3. **Asignación desde el móvil (portal del operador).** La asignación del combate la hace hoy el
-   operador por el flujo técnico; el portal con botones (Tatami 1-6, Bracket, Manuales, GitHub)
-   está pendiente.
-4. **Enlace "Manual" dentro de `/control`.** Pendiente de una mini-tarea de interfaz.
+3. **Asignación de combate desde el portal.** El **portal ya está publicado**
+   (`https://bjjvetusta.opsforge.cc`: Tatami 1, Bracket, manuales, guía rápida, GitHub), pero la
+   **asignación** de un combate a un tatami la sigue haciendo el operador por el flujo técnico; el
+   portal todavía no asigna combates.
+4. **Capturas reales.** Los esquemas de este manual son dibujos, no capturas: queda pendiente
+   sustituirlos por capturas reales anotadas de `/` y `/control`.
 5. **Publicación automática de resultados, clasificaciones y actas.**
 
-*Manual operativo del árbitro pendiente; antes de entregar `/control` a usuarios finales se
-publicará documentación online y PDF.*
+*Estado: este manual ya se publica online (HTML) y en PDF desde el centro de documentación, pero
+sigue en borrador hasta que un árbitro lo valide en una mesa real y se añadan las capturas.*

@@ -4,11 +4,28 @@
 // on the control pages, sends explicit canonical commands. It never keeps
 // authoritative scoring and never emits the legacy standalone events.
 (() => {
+ // Operational documentation lives in the docs centre; the link is static data,
+ // never fetched, so the UI keeps working with no network dependency.
+ const MANUAL_URL = 'https://docs.opsforge.cc/bjj/tatami/';
  const badge = document.createElement('div');
  badge.id = 'integrated-mode';
  badge.setAttribute('role', 'status');
  badge.style.cssText = 'position:fixed;top:0;left:0;z-index:1000;background:#222;color:#fff;padding:4px 8px;font:14px sans-serif';
  document.body.appendChild(badge);
+ // Static reference to the Tatami manual: navigation only, rendered below the
+ // status chip and never a scoring control, a socket or a state mutation.
+ const manual = document.createElement('div');
+ manual.id = 'integrated-manual';
+ manual.style.cssText = 'position:fixed;top:0;left:0;transform:translateY(100%);z-index:1000;background:#222;padding:4px 8px;font:14px sans-serif';
+ const manualLink = document.createElement('a');
+ manualLink.href = MANUAL_URL;
+ manualLink.target = '_blank';
+ manualLink.rel = 'noopener noreferrer';
+ manualLink.textContent = '? Manual';
+ manualLink.setAttribute('aria-label', 'Abrir el manual del Tatami en una pestaña nueva');
+ manualLink.style.cssText = 'color:#fff;text-decoration:underline';
+ manual.appendChild(manualLink);
+ document.body.appendChild(manual);
 
  // Legacy visual controls mapped to canonical score_delta operations.
  const SCORING = {

@@ -136,6 +136,10 @@ al correo autorizado.</p>
 <code>/control</code> en la pantalla del público da a cualquiera la posibilidad de modificar el combate.</p>
 <p>Arriba a la izquierda, en ambos casos, hay una etiqueta de estado de la forma
 <code>Integrated · &lt;estado&gt; · Control|Read-only</code> que indica la pantalla y el estado del combate.</p>
+<p>Justo <strong>debajo de esa etiqueta</strong>, en las tres pantallas (<code>/</code>, <code>/control</code> y <code>/control2</code>), hay un
+enlace <strong><code>? Manual</code></strong> que abre este mismo manual en una <strong>pestaña nueva</strong>. Se abre aparte a
+propósito: así no se pierde el combate que estés operando. Es <strong>solo navegación</strong> —no toca el
+marcador, ni el reloj, ni el estado del combate— y no requiere volver al portal.</p>
 <p><img alt="Esquema de zonas de la pantalla de control" src="/assets/esquema-control.svg" /></p>
 <p><em>Esquema de zonas (no es una captura). Los números remiten a las secciones siguientes
 de este manual.</em></p>
@@ -433,16 +437,18 @@ reloj y el marcador antes de continuar.</p>
    el cuadro del torneo ni en Bracket.</li>
 <li><strong>Roles internos de árbitro.</strong> No hay usuarios ni permisos dentro de la aplicación: quien
    entra en <code>/control</code> puede operar. La única barrera es Cloudflare Access.</li>
-<li><strong>Asignación desde el móvil (portal del operador).</strong> La asignación del combate la hace hoy el
-   operador por el flujo técnico; el portal con botones (Tatami 1-6, Bracket, Manuales, GitHub)
-   está pendiente.</li>
-<li><strong>Enlace "Manual" dentro de <code>/control</code>.</strong> Pendiente de una mini-tarea de interfaz.</li>
+<li><strong>Asignación de combate desde el portal.</strong> El <strong>portal ya está publicado</strong>
+   (<code>https://bjjvetusta.opsforge.cc</code>: Tatami 1, Bracket, manuales, guía rápida, GitHub), pero la
+   <strong>asignación</strong> de un combate a un tatami la sigue haciendo el operador por el flujo técnico; el
+   portal todavía no asigna combates.</li>
+<li><strong>Capturas reales.</strong> Los esquemas de este manual son dibujos, no capturas: queda pendiente
+   sustituirlos por capturas reales anotadas de <code>/</code> y <code>/control</code>.</li>
 <li><strong>Publicación automática de resultados, clasificaciones y actas.</strong></li>
 </ol>
-<p><em>Manual operativo del árbitro pendiente; antes de entregar <code>/control</code> a usuarios finales se
-publicará documentación online y PDF.</em></p>
+<p><em>Estado: este manual ya se publica online (HTML) y en PDF desde el centro de documentación, pero
+sigue en borrador hasta que un árbitro lo valide en una mesa real y se añadan las capturas.</em></p>
     <p class="footer">Generado desde <code>bjj/tatami-arbitro.md</code>
-    (sha256 8235e8e2bbf0) por <code>docs-site/build.py</code>.</p>
+    (sha256 7f9c30021b7a) por <code>docs-site/build.py</code>.</p>
   </main>
 </div>
 </body>

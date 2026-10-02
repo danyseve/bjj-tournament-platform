@@ -526,3 +526,27 @@ test('UI27 armar la cancelacion no sobrevive a un cambio de estado del servidor'
  assert.equal(p.doc.querySelector('#cancel-open').disabled,false,'vuelto a ready intacto se ofrece otra vez');
  assert.equal(p.doc.querySelector('#cancel-confirm').style.display,'none','y no queda armado de antes');
 });
+
+test('UI28 el manual operativo es un enlace estatico visible en las tres rutas',async t=>{
+ const {url}=await running(t);
+ for(const route of ['/','/control','/control2']) {
+  const p=await page(url,route);
+  const manual=p.doc.querySelector('#integrated-manual');
+  assert.ok(manual,'la ruta '+route+' ofrece el contenedor del manual');
+  const links=[...manual.querySelectorAll('a')];
+  assert.equal(links.length,1,'un unico enlace de manual en '+route);
+  const link=links[0];
+  assert.equal(link.tagName,'A','es un enlace de navegacion, no un control');
+  assert.equal(link.textContent,'? Manual');
+  assert.equal(link.getAttribute('href'),'https://docs.opsforge.cc/bjj/tatami/');
+  assert.equal(link.getAttribute('target'),'_blank');
+  assert.match(link.getAttribute('rel')||'',/\bnoopener\b/);
+  assert.match(link.getAttribute('rel')||'',/\bnoreferrer\b/);
+  assert.match(link.getAttribute('aria-label')||'',/manual del Tatami/);
+  assert.equal(link.closest('form'),null,'no vive dentro de ningun formulario');
+  assert.equal(p.registrations.filter(entry=>entry[1]==='integrated-manual').length,0,'el manual no registra handlers');
+  p.handlers['tatami:state'](sides());
+  assert.deepEqual(p.emits,[],'pintar el manual no emite ningun comando');
+  assert.equal(p.doc.querySelector('#integrated-mode').textContent.startsWith('Integrated ·'),true);
+ }
+});

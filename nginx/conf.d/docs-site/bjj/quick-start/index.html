@@ -172,7 +172,20 @@ visitante; no lo exime de autenticarse.</p>
 <p>Detalle operativo: la sesión de Access es <strong>por hostname</strong> (no hay sesión única entre aplicaciones),
 así que al pasar del portal a la documentación o al cuadro se vuelve a pedir el OTP. Es el
 comportamiento actual, no un error.</p>
-<h2 id="4-gestion-de-arbitros">4. Gestión de árbitros</h2>
+<h2 id="4-flujo-normal-del-usuario">4. Flujo normal del usuario</h2>
+<p>El recorrido completo, de principio a fin:</p>
+<ol>
+<li><strong>Abrir el portal</strong> — <code>https://bjjvetusta.opsforge.cc</code>.</li>
+<li><strong>Completar el OTP</strong> — Access pide el correo y envía el código de un solo uso.</li>
+<li><strong>Elegir herramienta</strong> desde el portal: <strong>Tatami 1</strong> (marcador y control), <strong>Bracket</strong> (cuadro) o
+   <strong>Documentación</strong>; cada tarjeta lleva su propio botón <code>Manual</code>.</li>
+<li><strong>Tatami 1 requiere alta previa</strong>: sin el correo en la allow-list no se entra (sección 5).
+   Portal, documentación y cuadro no la requieren.</li>
+<li><strong>El manual está accesible desde la propia UI</strong>: en la pantalla del tatami, debajo del indicador
+   de estado de la esquina superior izquierda, hay un enlace <code>? Manual</code> que abre este centro de
+   documentación en una pestaña nueva. No hace falta volver al portal.</li>
+</ol>
+<h2 id="5-gestion-de-arbitros">5. Gestión de árbitros</h2>
 <p>Las <strong>altas y bajas de árbitros y profesores</strong> (las identidades autorizadas de los tatamis) se hacen
 <strong>exclusivamente</strong> con el procedimiento <code>cloudflare-bjj-access</code>, que resuelve la aplicación por
 hostname exacto, lee antes de escribir y verifica el resultado con read-back:</p>
@@ -189,7 +202,7 @@ no autorizan personas, y un cambio ahí <strong>no</strong> da ni quita acceso. 
 base de datos, <code>/internal/*</code>) no tienen hostname público y no deben tenerlo.</p>
 <p>Las direcciones autorizadas <strong>no se versionan ni aparecen en informes</strong>: la herramienta enmascara
 las identidades en toda su salida.</p>
-<h2 id="5-como-comprobar-que-el-modelo-sigue-en-su-sitio">5. Cómo comprobar que el modelo sigue en su sitio</h2>
+<h2 id="6-como-comprobar-que-el-modelo-sigue-en-su-sitio">6. Cómo comprobar que el modelo sigue en su sitio</h2>
 <ul>
 <li><strong>Anónimo</strong>: abrir cualquiera de los cuatro hostnames en una ventana privada → debe aparecer el
   login de Access, nunca la aplicación.</li>
@@ -201,7 +214,7 @@ las identidades en toda su salida.</p>
 <p>La configuración concreta (aplicaciones, policies, sesiones y sus identificadores) se registra en el
 repositorio, en <code>docs/14-documentation-center.md</code> y en <code>docs/11-demo-externa-cloudflare.md</code> §22.</p>
     <p class="footer">Generado desde <code>bjj/quick-start.md</code>
-    (sha256 df5eff83bb3d) por <code>docs-site/build.py</code>.</p>
+    (sha256 30e1a645eb44) por <code>docs-site/build.py</code>.</p>
   </main>
 </div>
 </body>

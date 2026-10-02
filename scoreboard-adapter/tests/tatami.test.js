@@ -261,10 +261,13 @@ test('26 el marcador canonico no escribe resultados ni llama a Bracket', () => {
    assert.ok(source.includes(outbound) === false, file + ' sin llamada saliente: ' + outbound);
   }
   assert.ok(/['"]\/result/.test(source) === false, file + ' no expone ningun endpoint de resultados');
-  // Sin destino de red no puede haber escritura en Bracket: ni URL, ni ruta de
-  // su API, ni cliente HTTP (lo anterior). Las menciones en comentarios no son
-  // alcance: aqui se comprueba que no exista ningun destino.
-  assert.ok(/https?:\/\//.test(source) === false, file + ' sin URL de red');
+  // Sin destino de red no puede haber escritura en Bracket: ni ruta de su API ni
+  // cliente HTTP (lo anterior). Unica excepcion revisada (P2.6C): el enlace de
+  // navegacion al manual operativo del Tatami, un href estatico que ninguna API
+  // de red usa y cuyo contrato se fija en UI28. Cualquier otra URL sigue prohibida.
+  for (const url of source.match(/https?:\/\/[^'"\s`]+/g) || []) {
+   assert.equal(url, 'https://docs.opsforge.cc/bjj/tatami/', file + ' sin URL de red: ' + url);
+  }
   assert.ok(source.includes('/api/') === false, file + ' sin ruta de la API de Bracket');
  }
 });

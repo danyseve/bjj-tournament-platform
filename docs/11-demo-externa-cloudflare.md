@@ -631,3 +631,55 @@ prueba que el agente no puede producir sin manejar credenciales).
 registrador) y `www.opsforge.cc` (CNAME -> parkingpage.namecheap.com) no estan servidos por la
 infraestructura propia: responden 522/525. No se toco nada: la landing esta fuera del alcance de esta
 tarea y su politica prohibe modificar `opsforge.cc`.
+
+---
+
+## 24. P2.6C — UX operativa y endurecimiento web (CLOSED ✅, 2026-10-02)
+
+**Alcance**: experiencia de uso (portal y marcador) y endurecimiento, **sin** cambiar arquitectura ni la
+politica de acceso ya validada. La matriz Access queda intacta: auditoria `OK 4 · WARNING 0 · UNSAFE 0`,
+cero escrituras a la API de Access.
+
+**1. Manual accesible desde el marcador.** Enlace estatico `? Manual` -> `https://docs.opsforge.cc/bjj/tatami/`
+(`target="_blank"`, `rel="noopener noreferrer"`, `aria-label` propio), renderizado **bajo la etiqueta de
+estado** en las tres rutas (`/`, `/control`, `/control2`). Vive en `scoreboard-adapter/integrated-ui.js` y
+es **solo navegacion**: no altera controles, ni logica de scoring, ni sockets, ni estado. El documento del
+adaptador tenia un guard ("ninguna URL en los ficheros del adaptador"): se abre una **excepcion estrecha y
+comentada** en `tests/tatami.test.js` (test 26) que sigue prohibiendo cualquier otra URL; el contrato del
+enlace lo fija `tests/ui.test.js` test **UI28** (RED antes -> GREEN despues; suite 140/140).
+
+**2. Release de la imagen del marcador.** `docker build --no-cache -f docker/scoreboard/Dockerfile` ->
+tag `danyseve1/bjj-scoreboard:<sha7>-r1` (receta sin cambios => `r1`) -> push -> **digest fijado** en
+`docker-compose.yml`. Reemplazo **solo** de `scoreboard-tatami-1` (`up -d --no-deps`), estado preservado
+(`/state/state.json` con el **mismo sha256 y el mismo mtime** antes y despues), `restarts=0`,
+`health=healthy`. Bridge, Bracket, Postgres y WireGuard no se tocaron; **cero puertos nuevos**.
+
+**3. Quick Start y manual.** `docs-site/content/bjj/quick-start.md` gana el "Flujo normal del usuario"
+(portal -> OTP -> elegir herramienta -> Tatami exige alta previa -> manual desde la propia UI) y
+`tatami-arbitro.md` documenta el boton. El portal publica el acceso `GUÍA RÁPIDA` y la linea discreta
+`Acceso protegido por Cloudflare OTP`. Ninguna superficie del Tatami muestra identidades autorizadas.
+
+**4. Cabeceras — hallazgo real.** nginx **no hereda** `add_header`: una `location` que define el suyo
+**sustituye** los del `server`. Por eso los estaticos del portal y los assets/PDF de docs se servian **sin**
+cabeceras de seguridad. Corregido en `nginx/conf.d/`: portal (CSP estricta + XCTO + RP + XFO `DENY`), docs
+(CSP con `script-src 'none'` + XCTO + RP + XFO `SAMEORIGIN`), `tatami1` (CSP con
+`connect-src 'self' ws://tatami1.opsforge.cc wss://tatami1.opsforge.cc` + XCTO + RP + XFO `SAMEORIGIN`),
+`bracket` (XCTO + RP + XFO; **sin CSP**, que no se impone a ciegas a una SPA que no se puede ejercitar con
+sesion). Verificado que **Socket.IO sigue operativo**: engine.io polling `200` y **WebSocket 101** a traves
+de nginx. Sin scripts inline, sin origenes externos y sin `eval`/`new Function` en las paginas.
+
+**5. Control DNS permanente.** `scripts/audit_tunnel_targets.py` (skill `cloudflare-zone-ops`) audita en
+read-only **todos** los CNAME de la zona y sale con codigo **1** si alguno no termina exactamente en
+`.cfargotunnel.com` (nombra aparte el typo `cargotunnel.com`), si el UUID no es el esperado o si el registro
+no esta `proxied`. Ejecutado: **4/4 apps OK**; `www.opsforge.cc` -> parking del registrador (`INFO`, ajeno
+al tunel). Es el control que detecta el incidente 525 sin esperar a que un usuario lo reporte.
+
+**6. Estados en pantalla (sin cambiar la maquina de estados).** Verificado con un arnes jsdom que pinta los
+7 estados: `libre` (franja "Tatami 1 libre — sin combate asignado"), asignado/`ready`, `running`, `paused`
+(chip `Integrated · <estado> · Control|Read-only`, boton `Iniciar`/`Pausa` y reloj), `awaiting_result`
+(aviso "Tiempo finalizado — pendiente de resultado") y `finished` ("Finalizado · Ganador: … · método").
+**Decision conservadora**: el chip usa el token interno en ingles y 10 aserciones del suite dependen de el,
+asi que **no se traduce** en esta fase (queda documentado en el manual y como mejora opcional). El panel de
+cancelacion solo aparece con el combate intacto (`ready`, reloj lleno, sin puntos), como ya estaba.
+
+**Mini-tarea pendiente**: sustituir los esquemas del manual por **capturas reales anotadas**.

@@ -94,7 +94,21 @@ Detalle operativo: la sesión de Access es **por hostname** (no hay sesión úni
 así que al pasar del portal a la documentación o al cuadro se vuelve a pedir el OTP. Es el
 comportamiento actual, no un error.
 
-## 4. Gestión de árbitros
+## 4. Flujo normal del usuario
+
+El recorrido completo, de principio a fin:
+
+1. **Abrir el portal** — `https://bjjvetusta.opsforge.cc`.
+2. **Completar el OTP** — Access pide el correo y envía el código de un solo uso.
+3. **Elegir herramienta** desde el portal: **Tatami 1** (marcador y control), **Bracket** (cuadro) o
+   **Documentación**; cada tarjeta lleva su propio botón `Manual`.
+4. **Tatami 1 requiere alta previa**: sin el correo en la allow-list no se entra (sección 5).
+   Portal, documentación y cuadro no la requieren.
+5. **El manual está accesible desde la propia UI**: en la pantalla del tatami, debajo del indicador
+   de estado de la esquina superior izquierda, hay un enlace `? Manual` que abre este centro de
+   documentación en una pestaña nueva. No hace falta volver al portal.
+
+## 5. Gestión de árbitros
 
 Las **altas y bajas de árbitros y profesores** (las identidades autorizadas de los tatamis) se hacen
 **exclusivamente** con el procedimiento `cloudflare-bjj-access`, que resuelve la aplicación por
@@ -114,7 +128,7 @@ base de datos, `/internal/*`) no tienen hostname público y no deben tenerlo.
 Las direcciones autorizadas **no se versionan ni aparecen en informes**: la herramienta enmascara
 las identidades en toda su salida.
 
-## 5. Cómo comprobar que el modelo sigue en su sitio
+## 6. Cómo comprobar que el modelo sigue en su sitio
 
 - **Anónimo**: abrir cualquiera de los cuatro hostnames en una ventana privada → debe aparecer el
   login de Access, nunca la aplicación.
