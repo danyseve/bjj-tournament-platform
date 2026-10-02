@@ -32,13 +32,11 @@ services:
     restart: unless-stopped
 
   bracket:
-    # P2.5B — release de Tatami 1 preparado, NO aplicado: la imagen release
-    # (danyseve1/bracket-bjj:47bc129-r3, con el arreglo DEF-01/DEF-02) existe ya
-    # en local, pero NO se ha publicado, asi que aqui sigue el digest productivo
-    # de e6abd7d. En P2.5C se sustituye esta linea por el digest release:
-    #   image: danyseve1/bracket-bjj@sha256:<digest de 47bc129-r3>
-    # y solo entonces se recrea el contenedor.
-    image: danyseve1/bracket-bjj@sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8
+    # P2.5C — digest release de 47bc129-r3 publicado en el registry y fijado aqui.
+    # El contenedor solo se recrea al ejecutar `docker compose up -d` (P2.5D);
+    # P2.5C no ejecuta Compose. Rollback: volver al digest productivo anterior
+    #   sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8
+    image: danyseve1/bracket-bjj@sha256:8e9f2ca217c45637f5ffbc0b69c43bd6862ec04cda6a1400a46c22438155e9e1
     container_name: bracket
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
@@ -69,20 +67,21 @@ services:
         ipv4_address: 172.30.0.20
     restart: unless-stopped
 
-  # P2.5B — release de Tatami 1 (Bridge + scoreboard) bajo el perfil "tatami1".
-  # Consecuencia operativa buscada: un `up -d` sin perfil NO toca la produccion
-  # actual; el release se enciende con `--profile tatami1`, que es tambien el
-  # unico comando que aplica (y que revierte) el digest nuevo de Bracket.
+  # P2.5C — release de Tatami 1 (Bridge + scoreboard) bajo el perfil "tatami1".
+  # Imagenes publicadas en el registry y fijadas por digest (verificado en P2.5C).
   #
-  # Las cuatro variables marcadas con :? son obligatorias: sin ellas el fichero NO
+  # ATENCION (cambio de P2.5C): el digest del Bracket de arriba YA es el release,
+  # asi que un `up -d` SIN perfil tambien recrea el Bracket — es el primer paso
+  # deliberado de P2.5D. El release de Tatami 1 (Bridge + scoreboard) se enciende
+  # con `--profile tatami1`, que es el unico comando que aplica (y que revierte)
+  # el resto del release.
+  #
+  # Las cinco variables marcadas con :? son obligatorias: sin ellas el fichero NO
   # se renderiza (fail-fast pedido, en lugar de un valor por defecto silencioso).
-  # Hasta que .env las defina, cualquier comando de Compose en el host fallara
-  # nombrando la que falta; el paso 0 de P2.5C es anadirlas.
+  # P2.5C ya las ha anadido al `.env` productivo (tokens generados en el host).
   bridge-api:
-    build:
-      context: ./bridge-api
-    # P2.5C: publicar la imagen release y fijarla aqui por digest, sin `build:`.
-    # image: danyseve1/bjj-bridge-api@sha256:<digest de release>
+    # P2.5C — imagen release publicada y fijada por digest (sin `build:`).
+    image: danyseve1/bjj-bridge-api@sha256:6b6d5327118f98b2bed3fe5ac88ec0109216bf3d7f6f04942eeaaac8b1b437f6
     container_name: bjj-bridge-api
     profiles: ["tatami1"]
     depends_on:
@@ -113,11 +112,9 @@ services:
     restart: unless-stopped
 
   scoreboard-tatami-1:
-    build:
-      context: ./services/scoreboard
-    # P2.5C: publicar la imagen release (adapter con /health y persistencia) y
-    # fijarla aqui por digest, sin `build:`.
-    # image: danyseve1/bjj-scoreboard@sha256:<digest de release>
+    # P2.5C — imagen release (adapter con /health y persistencia) publicada y
+    # fijada por digest (sin `build:`).
+    image: danyseve1/bjj-scoreboard@sha256:024f0d5bf14c0891b0a2e3f3766d74381768379bd6e8a1f055d99a3f3e33074e
     container_name: scoreboard-tatami-1
     profiles: ["tatami1"]
     healthcheck:

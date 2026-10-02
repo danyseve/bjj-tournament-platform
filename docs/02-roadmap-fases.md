@@ -39,6 +39,21 @@ La escritura de resultados hacia Bracket sigue **desactivada por diseño**: el p
 modo lectura (`BRACKET_RESULT_WRITE_ENABLED=false`, requisito previo a implementar) y sin credenciales
 de escritura.
 
+## Pre-despliegue final y GO/NO-GO — P2.5C (GO, sin desplegar)
+
+Publicadas las tres imágenes release (`danyseve1/bracket-bjj:47bc129-r3`,
+`danyseve1/bjj-bridge-api:92d52df-r1`, `danyseve1/bjj-scoreboard:92d52df-r1`), arm64 y con sus
+RepoDigests registrados; Compose fijado por digest para las tres (sin tags flotantes, sin `build:` en
+Bridge ni scoreboard); secretos del contrato preparados en el `.env` productivo (modo 600, valores no
+registrados, `BRACKET_RESULT_WRITE_ENABLED=false` y credenciales de escritura fuera); directorio de
+estado `/home/ubuntu/data/bjj-tournament-platform/tatami-1` (1000:1000, 0700); backups pre-despliegue
+de PostgreSQL, Compose y `.env` con evidencia sin secretos; baseline de BD verificado (2 torneos /
+25 matches / 10 equipos / 16 rondas / 15 tablas, Alembic `c1ab44651e79`); render de Compose validado
+(sin perfil los 4 servicios de siempre; con `--profile tatami1` + Bridge + `scoreboard-tatami-1`, sin
+puertos nuevos) y comandos de rollback preparados. Checklist GO/NO-GO 18/18 YES, evidencia en §20 de
+`docs/10-plan-release-tatami1.md`. Producción intacta: no se ejecutó `docker compose up` ni se recreó
+nada.
+
 ## Prerrequisitos de release del Tatami 1 — P2.5B (artefactos listos, sin desplegar)
 
 Implementados los prerrequisitos técnicos del plan `docs/10-plan-release-tatami1.md` sin desplegar nada:

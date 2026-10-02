@@ -615,3 +615,146 @@ ni PostgreSQL.
 Commit `feat(release): prepare tatami 1 deployment artifacts` sobre `develop`
 (HEAD previo `331f03b…`, el commit de P2.5A) con los artefactos y la documentación de esta fase.
 Sin `amend`, sin `force-push`, sin tocar `main`, sin mover submódulos.
+
+---
+
+## 20. P2.5C — Pre-despliegue final y GO/NO-GO (2026-10-02)
+
+Resultado: `P2.5C — GO ✅ (ready to deploy, nothing recreated)`.
+Todo preparado para P2.5D; **nada desplegado**: no se ejecutó `docker compose up`, ni `pull`
+seguido de `up`, ni `recreate`, ni reinicio alguno, ni cambios en nginx, WireGuard o PostgreSQL.
+
+### 20.1 Imágenes release publicadas (registry bajo control propio)
+
+| Imagen | Tag | Image ID local | RepoDigest publicado | Arch | User |
+| --- | --- | --- | --- | --- | --- |
+| Bracket | `danyseve1/bracket-bjj:47bc129-r3` | `sha256:59944e01606c…43743b` | `sha256:8e9f2ca217c45637f5ffbc0b69c43bd6862ec04cda6a1400a46c22438155e9e1` | arm64/linux (v8) | `bracket` |
+| Bridge | `danyseve1/bjj-bridge-api:92d52df-r1` | `sha256:c2080cc69aad…bcc02` | `sha256:6b6d5327118f98b2bed3fe5ac88ec0109216bf3d7f6f04942eeaaac8b1b437f6` | arm64/linux | `bridge` |
+| Scoreboard | `danyseve1/bjj-scoreboard:92d52df-r1` | `sha256:5b1a2a5fd238…011c8` | `sha256:024f0d5bf14c0891b0a2e3f3766d74381768379bd6e8a1f055d99a3f3e33074e` | arm64/linux | `node` |
+
+- El Bracket se reconstruyó desde `47bc129d467a9544edd835aacbd49b5879e8adf6` con la receta `r3` y
+  produjo **el mismo Image ID** que la build de P2.5B (build reproducible). Etiqueta
+  `org.opencontainers.image.revision=47bc129…`, `recipe_revision=r3`. Healthcheck `/api/ping`.
+- La imagen productiva `danyseve1/bracket-bjj:e6abd7d-r3` **no se ha reetiquetado ni sobrescrito**.
+- Los tres digests se resolvieron de nuevo contra el registry (`docker manifest inspect -v`):
+  `arm64/linux` en los tres, `MediaType: application/vnd.docker.distribution.manifest.v2+json`.
+- Validaciones de las imágenes release: Bridge `User=bridge`, `WorkDir=/app`, puerto 8500,
+  `HEALTHCHECK /health`, sin `pytest`/`mypy`/`ruff` en la imagen y `requirements.txt` pinado;
+  Scoreboard `User=node`, puerto 3000, `HEALTHCHECK /health` (modo integrado con persistencia).
+
+### 20.2 Compose fijado por digest
+
+| Servicio | Antes | Después |
+| --- | --- | --- |
+| `bracket` | `danyseve1/bracket-bjj@sha256:e07ec8b4…8df8` | `danyseve1/bracket-bjj@sha256:8e9f2ca2…e9e1` |
+| `bridge-api` | `build: context: ./bridge-api` | `danyseve1/bjj-bridge-api@sha256:6b6d5327…37f6` |
+| `scoreboard-tatami-1` | `build: context: ./services/scoreboard` | `danyseve1/bjj-scoreboard@sha256:024f0d5b…074e` |
+
+Sin tags flotantes en los tres. El render base (sin perfil) es **idéntico** al anterior salvo
+`bracket.image` (`bracket-postgres`, `nginx` y `wireguard` sin cambios; las diferencias de rutas
+que aparecen al comparar contra el backup son un artefacto de resolver rutas relativas desde el
+directorio del backup, no un cambio real).
+
+**Consecuencia operativa (nueva respecto a P2.5B):** como el Bracket ya apunta al digest release,
+un `docker compose up -d` **sin perfil** también recrea el Bracket — es el primer paso deliberado
+de P2.5D. `--profile tatami1` es el comando que aplica el resto del release. P2.5C **no ejecuta
+Compose** (solo `config`).
+
+### 20.3 Secretos (.env productivo, modo 600; valores nunca registrados)
+
+Añadidas (nombres; los valores no se imprimen ni se documentan):
+
+- `SCOREBOARD_INTERNAL_TOKEN` — 64 hex, generado en el host con `openssl rand -hex 32`
+- `SCOREBOARD_CONTROL_TOKEN` — 64 hex, distinto del anterior (verificado)
+- `BRACKET_RESULT_WRITE_ENABLED=false`
+- `SCOREBOARD_TATAMI_1_URL=http://scoreboard-tatami-1:3000`
+
+No configuradas **a propósito** en el primer release: `BRACKET_WRITE_USERNAME`, `BRACKET_WRITE_PASSWORD`
+(el Bridge arranca y funciona con `write=false` sin ellas). `SCOREBOARD_STATE_FILE=/state/state.json`
+lo fija el propio Compose. El Bridge **no** recibe `SCOREBOARD_CONTROL_TOKEN` (no lo necesita);
+el scoreboard recibe ambos tokens.
+
+### 20.4 Directorio de estado
+
+`/home/ubuntu/data/bjj-tournament-platform/tatami-1` → `owner 1000:1000`, modo `0700`, montado en
+`/state`. El contenedor corre como `node` (uid 1000) y el propio Dockerfile hace `chown node:node /state`.
+La escritura real del adapter en un directorio equivalente (uid 1000, `drwx------`) ya quedó
+demostrada de punta a punta en el E2E aislado de P2.5B. **No se creó `state.json` a mano.**
+
+### 20.5 Backups pre-despliegue
+
+- **PostgreSQL** (sistema existente, `pre-p25d-20261002T101652Z`):
+  `/home/ubuntu/backups/bjj-tournament-platform/postgres/pre-p25d-20261002T101652Z/`
+  con `MANIFEST.txt`, `SHA256SUMS`, `bracket_dev.dump` (55 256 B, formato custom), `globals.sql`,
+  `restore-list.txt`. Validación: `sha256sum -c SHA256SUMS` OK; `pg_restore -l` lista el archivo
+  (167 entradas TOC; 15 `TABLE DATA`, coherente con las 15 tablas). Retención: **0 backups borrados**.
+- **Compose y `.env`**: `/home/ubuntu/backups/bjj-tournament-platform/pre-p25d-20261002T101752Z/`
+  con `docker-compose.yml.pre-p25d-…`, `.env.pre-p25d-…` (modo 600) y
+  `evidence-pre-p25d-….txt` (snapshot textual sin secretos: contenedores, imágenes, digests, hashes,
+  revisiones, conteos de BD y revisión Alembic).
+
+### 20.6 Baseline de BD (solo lectura)
+
+PostgreSQL **16.14** · Alembic **c1ab44651e79** · **2** torneos · **25** matches · **10** equipos ·
+**16** rondas · **15** tablas → idéntico al baseline esperado. Sin escrituras ni migraciones.
+
+### 20.7 WRITE gate
+
+`BRACKET_RESULT_WRITE_ENABLED=false` (valor renderizado, verificado en `bridge-api`). El gate está
+en `bridge-api/app/main.py:166`, **antes** de pedir credenciales o leer scoreboard/Bracket; el motivo
+es `result_write_disabled` (`bridge-api/app/result_gate.py:50`) y el default de código es `False`
+(`bridge-api/app/config.py:20`). Evidencia: **225 tests passed** en `bridge-api/tests` (incluye los
+casos de la fase) y el E2E aislado de P2.5B (503 ×2, cero `PUT` al Bracket). La imagen release tiene
+el mismo Image ID que la validada (`c2080cc6…`). No se ha tocado producción para comprobarlo.
+
+### 20.8 Rollback (comandos preparados, NO ejecutados)
+
+```sh
+cd /home/ubuntu/projects/bjj-tournament-platform
+B=/home/ubuntu/backups/bjj-tournament-platform/pre-p25d-20261002T101752Z
+
+# 1) Bracket → digest productivo anterior (e07ec8b4…), retirando también los pines release
+cp "$B/docker-compose.yml.pre-p25d-20261002T101752Z" docker-compose.yml
+docker compose up -d bracket
+
+# 2) Bridge y scoreboard: parar y retirar los servicios nuevos conservando el estado
+docker compose --profile tatami1 stop bridge-api scoreboard-tatami-1
+docker compose --profile tatami1 rm -f bridge-api scoreboard-tatami-1   # NO borra el bind mount /state
+
+# 3) .env
+cp "$B/.env.pre-p25d-20261002T101752Z" .env && chmod 600 .env
+```
+
+El digest de rollback del Bracket sigue disponible **en local** (`danyseve1/bracket-bjj:e6abd7d-r3`,
+Image ID `09b19930bde2…`) y **en el registry** (`sha256:e07ec8b4…8df8` resuelve). El backup de
+PostgreSQL se restauraría con el runbook existente (`docs/04-backup-restore.md`).
+
+### 20.9 Checklist GO/NO-GO
+
+| # | Criterio | Resultado |
+| --- | --- | --- |
+| 1 | Git limpio (`develop` == `origin/develop`, `92d52df`) | YES |
+| 2 | Imágenes release publicadas | YES |
+| 3 | Digests fijados en Compose | YES |
+| 4 | arm64 validado (registry, los tres) | YES |
+| 5 | Healthchecks validados (bracket `/api/ping`, bridge `/health`, scoreboard `/health`) | YES |
+| 6 | Secretos preparados (`.env` 600, nombres verificados) | YES |
+| 7 | `BRACKET_RESULT_WRITE_ENABLED=false` | YES |
+| 8 | Directorio de estado preparado (1000:1000, 0700) | YES |
+| 9 | Backup PostgreSQL válido | YES |
+| 10 | Backups Compose/`.env` válidos | YES |
+| 11 | Rollback exacto disponible | YES |
+| 12 | Baseline de BD sano (2/25/10/16/15) | YES |
+| 13 | Render de Compose correcto | YES |
+| 14 | Producción sana | YES |
+| 15 | Ninguna migración pendiente (`AUTO_RUN_MIGRATIONS=false`, Alembic en head) | YES |
+| 16 | Ningún puerto público nuevo | YES |
+| 17 | Tatami 2–6 fuera del render | YES |
+| 18 | WireGuard fuera de cambio | YES |
+
+### 20.10 Estado final
+
+Producción intacta: los cuatro contenedores conservan **mismos IDs y `StartedAt`** y `restarts=0`; el
+Bracket en ejecución sigue siendo la imagen `sha256:e07ec8b4…8df8` (`revision=e6abd7d…`). No se ejecutó
+`docker compose up`, ni `recreate`, ni `restart`, ni `pull` seguido de `up`, ni cambios en nginx.
+P2.5C termina **antes** del despliegue.
