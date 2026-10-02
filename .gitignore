@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.prod
+.env.*
+!.env.example
 *.env
 
 # Logs
@@ -41,3 +43,12 @@ Thumbs.db
 *.p12
 *.ovpn
 wg0.conf
+
+# P2.7A — dataset real del ensayo: datos personales, NUNCA versionar.
+# El fixture versionable es tests/fixtures/tournament-rehearsal-anonymized.json
+private/
+*dataset-real*.json
+dataset-real.json
+*rehearsal-real*.json
+rehearsal-real.json
+*.private.json

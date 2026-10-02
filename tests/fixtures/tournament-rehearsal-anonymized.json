@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "source": "anonymized",
+  "note": "Fixture anonimizado del ensayo P2.7A. Mantiene 25 participantes, la distribución real por categoría (3/2/6/7/2/5) y el perfil estructural de nulos. Edad y peso actual son valores sintéticos; en la DB no se importan (§5).",
+  "event": {
+    "name": "Torneo Interno CREE Masculino",
+    "date": "2026-10-17"
+  },
+  "categories": [
+    {
+      "name": "-62 kg",
+      "limit_kg": 62
+    },
+    {
+      "name": "-66 kg",
+      "limit_kg": 66
+    },
+    {
+      "name": "-71 kg",
+      "limit_kg": 71
+    },
+    {
+      "name": "-77 kg",
+      "limit_kg": 77
+    },
+    {
+      "name": "-84 kg",
+      "limit_kg": 84
+    },
+    {
+      "name": "-92 kg",
+      "limit_kg": 92
+    }
+  ],
+  "competitors": [
+    {
+      "id": "C001",
+      "name": "Competidor 001",
+      "team": "Equipo A",
+      "age": 19,
+      "actual_weight": 60.5,
+      "category_weight": 62.0
+    },
+    {
+      "id": "C002",
+      "name": "Competidor 002",
+      "team": null,
+      "age": 20,
+      "actual_weight": 59.5,
+      "category_weight": 62.0
+    },
+    {
+      "id": "C003",
+      "name": "Competidor 003",
+      "team": null,
+      "age": null,
+      "actual_weight": 58.5,
+      "category_weight": 62.0
+    },
+    {
+      "id": "C004",
+      "name": "Competidor 004",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 65.5,
+      "category_weight": 66.0
+    },
+    {
+      "id": "C005",
+      "name": "Competidor 005",
+      "team": "Equipo C",
+      "age": null,
+      "actual_weight": null,
+      "category_weight": 66.0
+    },
+    {
+      "id": "C006",
+      "name": "Competidor 006",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 68.5,
+      "category_weight": 71.0
+    },
+    {
+      "id": "C007",
+      "name": "Competidor 007",
+      "team": "Equipo D",
+      "age": null,
+      "actual_weight": null,
+      "category_weight": 71.0
+    },
+    {
+      "id": "C008",
+      "name": "Competidor 008",
+      "team": "Equipo D",
+      "age": null,
+      "actual_weight": null,
+      "category_weight": 71.0
+    },
+    {
+      "id": "C009",
+      "name": "Competidor 009",
+      "team": "Equipo E",
+      "age": null,
+      "actual_weight": 69.5,
+      "category_weight": 71.0
+    },
+    {
+      "id": "C010",
+      "name": "Competidor 010",
+      "team": "Equipo E",
+      "age": null,
+      "actual_weight": 68.5,
+      "category_weight": 71.0
+    },
+    {
+      "id": "C011",
+      "name": "Competidor 011",
+      "team": "Equipo E",
+      "age": null,
+      "actual_weight": 67.5,
+      "category_weight": 71.0
+    },
+    {
+      "id": "C012",
+      "name": "Competidor 012",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 76.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C013",
+      "name": "Competidor 013",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 75.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C014",
+      "name": "Competidor 014",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 74.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C015",
+      "name": "Competidor 015",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 73.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C016",
+      "name": "Competidor 016",
+      "team": "Equipo A",
+      "age": 34,
+      "actual_weight": 76.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C017",
+      "name": "Competidor 017",
+      "team": "Equipo A",
+      "age": 35,
+      "actual_weight": 75.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C018",
+      "name": "Competidor 018",
+      "team": "Equipo E",
+      "age": null,
+      "actual_weight": 74.5,
+      "category_weight": 77.0
+    },
+    {
+      "id": "C019",
+      "name": "Competidor 019",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 80.5,
+      "category_weight": 84.0
+    },
+    {
+      "id": "C020",
+      "name": "Competidor 020",
+      "team": null,
+      "age": null,
+      "actual_weight": 83.5,
+      "category_weight": 84.0
+    },
+    {
+      "id": "C021",
+      "name": "Competidor 021",
+      "team": "Equipo B",
+      "age": null,
+      "actual_weight": 90.5,
+      "category_weight": 92.0
+    },
+    {
+      "id": "C022",
+      "name": "Competidor 022",
+      "team": "Equipo A",
+      "age": 20,
+      "actual_weight": 89.5,
+      "category_weight": 92.0
+    },
+    {
+      "id": "C023",
+      "name": "Competidor 023",
+      "team": "Equipo A",
+      "age": 21,
+      "actual_weight": 88.5,
+      "category_weight": 92.0
+    },
+    {
+      "id": "C024",
+      "name": "Competidor 024",
+      "team": "Equipo C",
+      "age": null,
+      "actual_weight": 91.5,
+      "category_weight": 92.0
+    },
+    {
+      "id": "C025",
+      "name": "Competidor 025",
+      "team": "Equipo C",
+      "age": null,
+      "actual_weight": 90.5,
+      "category_weight": 92.0
+    }
+  ]
+}
