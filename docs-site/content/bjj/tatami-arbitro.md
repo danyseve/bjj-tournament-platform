@@ -74,8 +74,9 @@ Regla práctica: **el proyector siempre en `/`; el árbitro siempre en `/control
 Arriba a la izquierda, en ambos casos, hay una etiqueta de estado de la forma
 `Integrated · <estado> · Control|Read-only` que indica la pantalla y el estado del combate.
 
-Justo **debajo de esa etiqueta**, en las tres pantallas (`/`, `/control` y `/control2`), hay un
-enlace **`? Manual`** que abre este mismo manual en una **pestaña nueva**. Se abre aparte a
+En esa **misma barra de estado** —a su derecha, tras un separador `|`— y en las tres pantallas
+(`/`, `/control` y `/control2`), hay un enlace **`? Manual`** que abre este mismo manual en una
+**pestaña nueva**. Se abre aparte a
 propósito: así no se pierde el combate que estés operando. Es **solo navegación** —no toca el
 marcador, ni el reloj, ni el estado del combate— y no requiere volver al portal.
 

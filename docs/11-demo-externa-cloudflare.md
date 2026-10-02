@@ -683,3 +683,45 @@ asi que **no se traduce** en esta fase (queda documentado en el manual y como me
 cancelacion solo aparece con el combate intacto (`ready`, reloj lleno, sin puntos), como ya estaba.
 
 **Mini-tarea pendiente**: sustituir los esquemas del manual por **capturas reales anotadas**.
+
+---
+
+## 25. P2.6C.1 — Enlace `? Manual` visible en el chip de estado (CLOSED ✅, 2026-10-02)
+
+**Sintoma**: la validacion humana real de `https://tatami1.opsforge.cc/control` mostraba el chip
+`Integrated · Waiting for assignment · Control` pero **no** el enlace `? Manual`.
+
+**Diagnostico**: el enlace vivia en un `div` propio (`#integrated-manual`) fijado con
+`position:fixed;top:0;left:0;transform:translateY(100%)`, es decir colgando de un supuesto layout
+(quedar justo debajo del chip) que **no se puede comprobar sin navegador** y que la pagina real no
+respetaba. Nota honesta: desde el contenedor de operacion no hay ruta al host (8080 no expuesto) ni
+acceso al borde sin sesion de Access, y el Chromium local no arranca (faltan 19 bibliotecas), asi que
+**el efecto visual no es reproducible por el agente**; por eso el cambio no intenta «corregir el
+offset» sino **eliminar la suposicion**.
+
+**Cambio**: el enlace pasa **dentro del propio chip** (`#integrated-mode`, el elemento que el operador
+ya ve) como tercer hijo: `span#integrated-mode-text` + separador `|` (`aria-hidden`) +
+`a#integrated-manual`. El texto del chip se actualiza en su propio `span` para que el repintado de
+estado **no borre** el enlace. La barra pasa a `display:flex;gap:8px;white-space:nowrap` y el enlace
+lleva `color:#fff` explicito sobre el fondo oscuro del chip. Sigue siendo **solo navegacion**:
+`target="_blank"`, `rel="noopener noreferrer"`, `aria-label`, sin handlers, sin emitir comandos.
+
+**Tests**: UI28 reescrito a los seis requisitos (un unico enlace, href exacto, `target`, `rel`, **hijo
+del chip** con color explicito y **ningun otro destino externo**) y ampliado a **3 rutas x 6 estados**
+= 18 combinaciones; ademas comprueba que el repintado no borra el enlace y que el adaptador sigue con
+un unico literal de URL. El guard test 26 conserva su **excepcion estrecha** (solo la URL literal del
+manual). RED antes del cambio (`/ / libre: exactamente un enlace de manual  0 !== 1`) → **GREEN 140/140**.
+
+**Evidencia objetiva** (arnes jsdom sobre el codigo del repo, byte-identico al de la imagen por
+sha256): 18/18 combinaciones con el enlace dentro del chip; cascada resuelta con el CSS real servido:
+chip `position=fixed`, `z-index=1000`, fondo `rgb(34,34,34)`, texto `rgb(255,255,255)`, sin ancestro
+oculto. Recordatorio metodologico (skill `browserless-ui-validation`): esto prueba **estructura y
+cascada**, no pixeles; el juicio visual es del operador.
+
+**Release**: imagen reproducible `danyseve1/bjj-scoreboard:dc5003f-r1`, digest
+`sha256:5c6ef8932f9a88c2e9ca644827cdfd15a6f0194247b0a994847463e84d8ea036` verificado por tres vias y
+fijado en `docker-compose.yml`. Reemplazo **solo** de `scoreboard-tatami-1` (`--no-deps`):
+`restarts=0`, `health=healthy`, `/state/state.json` con **el mismo sha256 y mtime** (`state=null`,
+`command_history` vacio), `/control` 200, `/health` 200, polling 200, WebSocket **101**. Bridge,
+Bracket, Postgres, WireGuard y nginx sin recrear; **cero** cambios en Access, DNS, routing, WRITE y
+maquina de estados.

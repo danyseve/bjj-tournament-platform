@@ -104,9 +104,10 @@ El recorrido completo, de principio a fin:
    **Documentación**; cada tarjeta lleva su propio botón `Manual`.
 4. **Tatami 1 requiere alta previa**: sin el correo en la allow-list no se entra (sección 5).
    Portal, documentación y cuadro no la requieren.
-5. **El manual está accesible desde la propia UI**: en la pantalla del tatami, debajo del indicador
-   de estado de la esquina superior izquierda, hay un enlace `? Manual` que abre este centro de
-   documentación en una pestaña nueva. No hace falta volver al portal.
+5. **El manual está accesible desde la propia UI**: en la pantalla del tatami, en la propia barra
+   de estado de la esquina superior izquierda (a la derecha del estado, tras `|`), hay un enlace
+   `? Manual` que abre este centro de documentación en una pestaña nueva. No hace falta volver al
+   portal.
 
 ## 5. Gestión de árbitros
 
