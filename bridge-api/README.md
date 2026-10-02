@@ -189,12 +189,44 @@ combate vuelve a la lista y `assign-match` vuelve a aceptar con una `session_id`
 nueva. La selección sigue siendo del operador: la lista no asigna nada.
 
 Nota de alcance: la lista es un `GET` sin estado; el estado vivo del Tatami 1 sigue
-viviendo **solo en memoria** del scoreboard (sin persistencia ni recuperación).
+viviendo en memoria del scoreboard en el despliegue actual. La persistencia existe
+desde P2.4B pero es **opt-in** (`SCOREBOARD_STATE_FILE`, ver
+`scoreboard-adapter/README.md`) y **no** está activada en el Compose desplegado.
 
 ### Resultados deshabilitados
 
 `POST /tatamis/{tatami_id}/result` devuelve explícitamente **HTTP 501**, incluso
 sin body o con el body legado. No invoca ningún transporte ni realiza escrituras.
+
+## Traducción de resultados a Bracket (P2.4C)
+
+Diseño, no implementación: **no existe ningún `PUT` de resultados** y el endpoint
+sigue en 501. La política está documentada y justificada con el código real de
+Bracket en `docs/adr/ADR-001-politica-traduccion-resultados-bjj.md`.
+
+Resumen operativo:
+
+- Bracket solo representa **dos enteros**; el ganador es
+  `score1 > score2` y un empate deja el árbol bloqueado (la ronda siguiente se
+  queda sin rivales). No hay campo de método, ventajas, penalizaciones ni ganador
+  explícito.
+- Por eso **solo la victoria por puntos es traducible sin falsear datos**. Los
+  casos de submission, decision, disqualification, walkover, referee_stoppage,
+  empate con ventaja/penalización decisiva y `other` quedan en
+  `pending_manual` y **no se escriben**. El caso de DQ es además peligroso:
+  escribir los puntos reales declararía ganador al rival.
+- Un futuro `PUT` debe reenviar `round_id`, `court_id`,
+  `custom_duration_minutes` y `custom_margin_minutes` leídos del match actual:
+  el body es un reemplazo completo y esos campos no admiten `null` (provoca 500).
+  Un match sin pista asignada no se puede actualizar por esta vía.
+- Idempotencia prevista: un `result_fingerprint` derivado de
+  `session_id`/`revision`/ganador/método/puntos con estado
+  `none | pending_manual | written | failed | conflict`, y lectura previa del
+  match para detectar cambios de otro operador antes de escribir.
+- Antes de habilitar cualquier escritura hay que resolver dos defectos del
+  Bracket actual: el filtro de torneo que se pierde en las dependencias por un
+  `and` de Python (`routes/util.py:24,67,84`) y el `StatementError` cuando
+  `court_id`/`custom_*` son `null`.
 
 ## Pruebas aisladas
 
