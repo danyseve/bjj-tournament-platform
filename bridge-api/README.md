@@ -1,8 +1,11 @@
-# BJJ Bridge API — P2.3A / P2.3D
+# BJJ Bridge API — P2.3A / P2.4A
 
 Capa de lectura y normalización entre Bracket y BJJ-Scoreboard. Desde P2.3D
 entrega además la asignación normalizada al scoreboard integrado del **Tatami 1**
-por HTTP; **sigue sin escribir resultados en Bracket**, al que solo hace `GET`.
+por HTTP. Desde P2.4A puede además **listar los combates candidatos** de un torneo
+(`GET /tatamis/1/candidates`), pero **elegir y asignar sigue siendo un acto
+explícito del operador**: no existe autoavance ni asignación silenciosa.
+**Sigue sin escribir resultados en Bracket**, al que solo hace `GET`.
 
 ## Configuración de la URL
 
@@ -33,6 +36,7 @@ configurado, la entrega devuelve error en vez de simular éxito.
 ```text
 GET  /health
 GET  /health/bracket
+GET  /tatamis/{tatami_id}/candidates?tournament_id=...
 POST /tatamis/{tatami_id}/assign-match
 POST /tatamis/{tatami_id}/result
 ```
@@ -103,6 +107,89 @@ Errores de asignación:
   conexión rechazada, 5xx y respuesta inválida del scoreboard, y el token interno
   sin configurar. Nunca se disfraza de éxito.
 - 504: timeout de Bracket o del scoreboard.
+
+### Candidatos (solo lectura)
+
+`GET /tatamis/1/candidates?tournament_id=7` devuelve una lista **técnica y plana**
+de combates jugables, sin asignar nada. Solo está permitido `tatami_id=1` (otro
+valor: 400) y el `tournament_id` debe ser un entero positivo estricto (400 si no
+lo es; 422 si falta o no es un entero).
+
+```json
+{
+  "tournament_id": 7,
+  "active_match_id": 40,
+  "scoreboard_read": true,
+  "candidates": [
+    {
+      "tournament_id": 7,
+      "match_id": 41,
+      "fighter_a": {"stage_item_input_id": 11, "team_id": 101, "name": "Ana", "club": null},
+      "fighter_b": {"stage_item_input_id": 12, "team_id": 102, "name": "Bea", "club": null},
+      "category": {"stage_item_id": 2, "name": "Adulto -70"},
+      "duration_seconds": 420
+    }
+  ]
+}
+```
+
+Sin datos innecesarios: cada candidato lleva solo esos seis campos (ni scores, ni
+`winner_from_*`, ni `court_id`, ni `position_in_schedule`, ni `is_draft`).
+
+**Orden.** Se respeta exactamente el orden que devuelve Bracket
+(`data[] → stage_items[] → rounds[] → matches[]`). **No se reordena por
+`match_id`**: el payload real del torneo 1 lo demuestra — los combates de la ronda
+4 (ids 7 y 8) llegan antes que los de la ronda 1 (ids 1 y 2), así que ordenar por
+id rompería el orden del propio Bracket. Tampoco se reasigna `court_id` ni se toca
+`position_in_schedule`.
+
+**Reglas de candidatura.** Se listan los combates que cumplen el contrato de
+asignación, construidos con **el mismo normalizador** que usa `assign-match`, de
+modo que todo candidato listado es asignable por construcción. Se omiten:
+
+- combates de rondas `is_draft=true`;
+- combates con un pase sin resolver (sin `stage_item_inputN_id`, sin objeto de
+  input o alimentado por un `winner_from_match_id` pendiente);
+- combates con equipo ausente, `team_id` no positivo o conflicto marcado;
+- combates con identidades repetidas (mismo `team_id` o mismo
+  `stage_item_input_id` en ambos lados);
+- combates sin duración utilizable (`custom_duration_minutes` y, si es `null`,
+  `duration_minutes`, deben ser enteros positivos);
+- combates de otro torneo (pertenencia inconsistente ⇒ 502, no lista silenciosa);
+- un `match_id` que aparezca dos veces en el payload: la asignación no podría
+  resolverlo, así que no se lista.
+
+**Match ya jugado: no se puede saber, y no se adivina.** El payload de Bracket
+expone `stage_item_inputN_score` pero **ninguna bandera fiable de "terminado"**: en
+el torneo 1 real todos los combates traen scores distintos de cero (p. ej. 5-5 o
+10-7) sin que eso signifique nada. Por eso **no se filtra por score** y un combate
+dudoso se incluye antes que inferir un estado incorrecto. Un pase pendiente sí se
+descarta porque es un hecho del dato (no hay equipo), no una inferencia.
+
+**Tatami ocupado.** `candidates` se puede consultar igualmente mientras el Tatami 1
+tiene un combate activo: el match activo del **mismo torneo** se excluye de la
+lista y se anuncia en `active_match_id`; el de otro torneo no se descuenta (los
+`match_id` no son únicos entre torneos). `scoreboard_read` indica si el estado del
+scoreboard se pudo leer: si no, la lista se devuelve igual y **no se inventa** ni
+se omite nada por esa razón.
+
+**Cómo asigna el operador** (dos llamadas separadas, nunca una sola que liste y
+asigne):
+
+```sh
+curl -s 'http://bridge:8500/tatamis/1/candidates?tournament_id=7'
+curl -s -X POST http://bridge:8500/tatamis/1/assign-match \
+     -H 'Content-Type: application/json' \
+     -d '{"tatami_id": 1, "tournament_id": 7, "match_id": 41}'
+```
+
+Si el tatami ya tiene combate, `assign-match` de **otro** match sigue devolviendo
+**409** hasta que el scoreboard reciba `clear_match` (P2.3G); tras liberar, el
+combate vuelve a la lista y `assign-match` vuelve a aceptar con una `session_id`
+nueva. La selección sigue siendo del operador: la lista no asigna nada.
+
+Nota de alcance: la lista es un `GET` sin estado; el estado vivo del Tatami 1 sigue
+viviendo **solo en memoria** del scoreboard (sin persistencia ni recuperación).
 
 ### Resultados deshabilitados
 

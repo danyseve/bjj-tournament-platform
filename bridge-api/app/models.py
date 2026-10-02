@@ -47,3 +47,28 @@ class AssignMatchResponse(BaseModel):
     scoreboard_sent: Literal[True] = True
     match: NormalizedMatch
     state: dict
+
+
+class MatchCandidate(BaseModel):
+    """Exactly what an operator needs to pick a match, and nothing else.
+
+    Same shape as the assignment payload so a chosen candidate can be sent to
+    `POST /tatamis/1/assign-match` without translation.
+    """
+
+    tournament_id: PositiveId
+    match_id: PositiveId
+    fighter_a: NormalizedFighter
+    fighter_b: NormalizedFighter
+    category: NormalizedCategory
+    duration_seconds: PositiveId
+
+
+class CandidatesResponse(BaseModel):
+    tournament_id: PositiveId
+    # The match the scoreboard currently holds for this tournament: it is left
+    # out of the list, and `scoreboard_read` says whether that could be checked
+    # at all. A missing answer never turns into a guessed list.
+    active_match_id: PositiveId | None = None
+    scoreboard_read: bool
+    candidates: list[MatchCandidate]

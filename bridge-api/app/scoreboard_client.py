@@ -29,6 +29,39 @@ class ScoreboardClient:
             raise ScoreboardError(f"Tatami {tatami} is not enabled", 400)
         return self.tatami_urls[self.ENABLED_TATAMI]
 
+    async def read_state(self, tatami: int) -> dict | None:
+        """Read the live state of Tatami 1; None means the tatami is empty.
+
+        Read-only on purpose: the bridge never learns a result from here and
+        never writes one back.
+        """
+        base_url = self.get_scoreboard_url(tatami)
+        if not self.token:
+            raise ScoreboardError("Scoreboard internal token is not configured", 502)
+        url = base_url.rstrip("/") + f"/internal/tatamis/{self.ENABLED_TATAMI}/state"
+        headers = {"X-Internal-Token": self.token}
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise ScoreboardError("Scoreboard request timed out", 504) from exc
+        except httpx.RequestError as exc:
+            raise ScoreboardError("Scoreboard request failed", 502) from exc
+        if response.status_code != 200:
+            raise ScoreboardError(f"Scoreboard returned HTTP {response.status_code}", 502)
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise ScoreboardError("Invalid Scoreboard JSON response", 502) from exc
+        if not isinstance(body, dict) or "state" not in body:
+            raise ScoreboardError("Invalid Scoreboard response shape", 502)
+        state = body["state"]
+        if state is None:
+            return None
+        if not isinstance(state, dict) or not state:
+            raise ScoreboardError("Invalid Scoreboard state shape", 502)
+        return state
+
     async def assign_match(self, tatami: int, payload: dict) -> dict:
         base_url = self.get_scoreboard_url(tatami)
         if not self.token:

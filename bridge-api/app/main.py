@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException, Response
 
-from app.bracket_client import BracketClient, BracketError, locate_match, normalize_match
-from app.models import AssignMatchRequest, AssignMatchResponse
+from app.bracket_client import (BracketClient, BracketError, collect_candidates, locate_match,
+                                normalize_match, positive_int)
+from app.models import (AssignMatchRequest, AssignMatchResponse, CandidatesResponse,
+                        MatchCandidate)
 from app.scoreboard_client import ScoreboardClient, ScoreboardError
 
 app = FastAPI(
@@ -58,6 +60,47 @@ async def assign_match(tatami_id: int, payload: AssignMatchRequest, response: Re
         scoreboard_sent=True,
         match=normalized,
         state=delivered["state"],
+    )
+
+
+def candidate_view(match) -> MatchCandidate:
+    """Explicit field selection: a candidate carries nothing else."""
+    return MatchCandidate(
+        tournament_id=match.tournament_id,
+        match_id=match.match_id,
+        fighter_a=match.fighter_a,
+        fighter_b=match.fighter_b,
+        category=match.category,
+        duration_seconds=match.duration_seconds,
+    )
+
+
+@app.get("/tatamis/{tatami_id}/candidates", response_model=CandidatesResponse)
+async def list_candidates(tatami_id: int, tournament_id: int):
+    """Read-only candidate list for Tatami 1. Listing assigns nothing."""
+    if tatami_id != 1:
+        raise HTTPException(status_code=400, detail="Only tatami_id 1 is supported")
+    try:
+        positive_int(tournament_id, "tournament_id")
+    except BracketError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        stages = await bracket_client.fetch_stages(tournament_id)
+        playable = collect_candidates(stages, tournament_id)
+    except BracketError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    scoreboard_read, active_match_id = True, None
+    try:
+        state = await scoreboard_client.read_state(tatami_id)
+        if state is not None and state.get("tournament_id") == tournament_id:
+            active_match_id = state.get("match_id")
+    except ScoreboardError:
+        scoreboard_read = False
+    return CandidatesResponse(
+        tournament_id=tournament_id,
+        active_match_id=active_match_id,
+        scoreboard_read=scoreboard_read,
+        candidates=[candidate_view(match) for match in playable if match.match_id != active_match_id],
     )
 
 

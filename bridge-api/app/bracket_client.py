@@ -102,6 +102,54 @@ def locate_match(payload: dict, tournament_id: int, match_id: int) -> tuple[dict
     return found
 
 
+def collect_candidates(payload: dict, tournament_id: int) -> list:
+    """Playable matches of one tournament, in the exact order Bracket returns them.
+
+    The list is built with the same normalizer the assignment uses, so every
+    listed candidate is assignable by construction. A match that does not meet
+    the assignment contract (unresolved input, missing team, duplicated
+    participants, unusable duration, foreign identity) is skipped, never
+    guessed at; a match_id that appears twice is skipped because the assignment
+    cannot resolve it. Structural violations of stage, stage_item or round
+    identity remain hard errors.
+
+    Order is the received order (stage -> stage_item -> round -> match). It is
+    deliberately NOT sorted by match_id: the payload order is the only real
+    order Bracket exposes, and ids do not follow it.
+
+    Scores and winner_from_* pointers are intentionally NOT used here: the
+    payload cannot tell a finished match from a played one (see README).
+    """
+    positive_int(tournament_id, "tournament_id")
+    playable, occurrences = [], {}
+    for stage in collection(object_value(payload), "data"):
+        stage = object_value(stage)
+        stage_id = positive_int(stage.get("id"), "stage_id")
+        identity(stage, "tournament_id", tournament_id)
+        for item in collection(stage, "stage_items"):
+            item = object_value(item)
+            item_id = positive_int(item.get("id"), "stage_item_id")
+            identity(item, "stage_id", stage_id)
+            for round_ in collection(item, "rounds"):
+                round_ = object_value(round_)
+                round_id = positive_int(round_.get("id"), "round_id")
+                identity(round_, "stage_item_id", item_id)
+                if type(round_.get("is_draft")) is not bool:
+                    raise BracketError("Invalid is_draft")
+                if round_["is_draft"]:
+                    continue
+                for match in collection(round_, "matches"):
+                    match = object_value(match)
+                    match_id = positive_int(match.get("id"), "match_id")
+                    identity(match, "round_id", round_id)
+                    occurrences[match_id] = occurrences.get(match_id, 0) + 1
+                    try:
+                        playable.append(normalize_match(match, item, tournament_id))
+                    except BracketError:
+                        continue
+    return [match for match in playable if occurrences[match.match_id] == 1]
+
+
 def nonempty_name(value, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise BracketError(f"Invalid {label}")
