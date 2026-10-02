@@ -10,22 +10,29 @@
  const badge = document.createElement('div');
  badge.id = 'integrated-mode';
  badge.setAttribute('role', 'status');
- badge.style.cssText = 'position:fixed;top:0;left:0;z-index:1000;background:#222;color:#fff;padding:4px 8px;font:14px sans-serif';
- document.body.appendChild(badge);
- // Static reference to the Tatami manual: navigation only, rendered below the
- // status chip and never a scoring control, a socket or a state mutation.
- const manual = document.createElement('div');
- manual.id = 'integrated-manual';
- manual.style.cssText = 'position:fixed;top:0;left:0;transform:translateY(100%);z-index:1000;background:#222;padding:4px 8px;font:14px sans-serif';
+ badge.style.cssText = 'position:fixed;top:0;left:0;z-index:1000;background:#222;color:#fff;padding:4px 8px;font:14px sans-serif;display:flex;align-items:center;gap:8px;white-space:nowrap';
+ // The chip text lives in its own span: repainting a state must never wipe the link.
+ const badgeText = document.createElement('span');
+ badgeText.id = 'integrated-mode-text';
+ badge.appendChild(badgeText);
+ const separator = document.createElement('span');
+ separator.setAttribute('aria-hidden', 'true');
+ separator.textContent = '|';
+ separator.style.cssText = 'opacity:0.6';
+ badge.appendChild(separator);
+ // Static reference to the Tatami manual: navigation only, integrated in the status
+ // bar the operator already sees, and never a scoring control, a socket or a state
+ // mutation. Keeping it inside the chip means page layout cannot hide it.
  const manualLink = document.createElement('a');
+ manualLink.id = 'integrated-manual';
  manualLink.href = MANUAL_URL;
  manualLink.target = '_blank';
  manualLink.rel = 'noopener noreferrer';
  manualLink.textContent = '? Manual';
  manualLink.setAttribute('aria-label', 'Abrir el manual del Tatami en una pestaña nueva');
- manualLink.style.cssText = 'color:#fff;text-decoration:underline';
- manual.appendChild(manualLink);
- document.body.appendChild(manual);
+ manualLink.style.cssText = 'color:#fff;background:transparent;text-decoration:underline;font:inherit';
+ badge.appendChild(manualLink);
+ document.body.appendChild(badge);
 
  // Legacy visual controls mapped to canonical score_delta operations.
  const SCORING = {
@@ -270,7 +277,7 @@
   remaining = null;
   document.querySelectorAll('.fighter-1-score,.fighter-2-score,.fighter-1-adv,.fighter-2-adv,.fighter-1-penal,.fighter-2-penal').forEach(node => {node.textContent = '0';});
   document.querySelectorAll('.points-score').forEach(node => {node.textContent = '—';});
-  badge.textContent = 'Integrated · Waiting for assignment · ' + (control === true ? 'Control' : 'Read-only');
+  badgeText.textContent = 'Integrated · Waiting for assignment · ' + (control === true ? 'Control' : 'Read-only');
   document.querySelectorAll('input[id^="fighter-"]').forEach(input => {input.value = ''; input.placeholder = '';});
   document.querySelectorAll('.timer').forEach(node => {node.textContent = '--:--';});
   armed = false;
@@ -280,7 +287,7 @@
   paint();
  }
  function present() {
-  badge.textContent = 'Integrated · ' + state.status + ' · ' + (control === true ? 'Control' : 'Read-only');
+  badgeText.textContent = 'Integrated · ' + state.status + ' · ' + (control === true ? 'Control' : 'Read-only');
   // The read-only display also reflects the pending or final result, without controls.
   result.textContent = resultText();
   const seconds = state.remaining_seconds;

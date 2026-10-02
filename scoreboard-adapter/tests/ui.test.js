@@ -527,26 +527,56 @@ test('UI27 armar la cancelacion no sobrevive a un cambio de estado del servidor'
  assert.equal(p.doc.querySelector('#cancel-confirm').style.display,'none','y no queda armado de antes');
 });
 
-test('UI28 el manual operativo es un enlace estatico visible en las tres rutas',async t=>{
+test('UI28 el manual vive dentro del chip de estado en las tres rutas y los seis estados',async t=>{
  const {url}=await running(t);
+ const MANUAL='https://docs.opsforge.cc/bjj/tatami/';
+ const states=[['libre',null],['ready',sides()],
+  ['running',{...sides(),status:'running',remaining_seconds:120,revision:2}],
+  ['paused',{...sides(),status:'paused',remaining_seconds:120,revision:3}],
+  ['awaiting_result',{...sides(),status:'awaiting_result',remaining_seconds:0,revision:4}],
+  ['finished',{...sides({points:4},{points:2}),status:'finished',remaining_seconds:0,revision:5,winner_team_id:101,method:'points'}]];
  for(const route of ['/','/control','/control2']) {
   const p=await page(url,route);
-  const manual=p.doc.querySelector('#integrated-manual');
-  assert.ok(manual,'la ruta '+route+' ofrece el contenedor del manual');
-  const links=[...manual.querySelectorAll('a')];
-  assert.equal(links.length,1,'un unico enlace de manual en '+route);
-  const link=links[0];
-  assert.equal(link.tagName,'A','es un enlace de navegacion, no un control');
-  assert.equal(link.textContent,'? Manual');
-  assert.equal(link.getAttribute('href'),'https://docs.opsforge.cc/bjj/tatami/');
-  assert.equal(link.getAttribute('target'),'_blank');
-  assert.match(link.getAttribute('rel')||'',/\bnoopener\b/);
-  assert.match(link.getAttribute('rel')||'',/\bnoreferrer\b/);
-  assert.match(link.getAttribute('aria-label')||'',/manual del Tatami/);
-  assert.equal(link.closest('form'),null,'no vive dentro de ningun formulario');
+  const chip=p.doc.querySelector('#integrated-mode');
+  assert.ok(chip,'la ruta '+route+' tiene chip de estado');
+  // El chip fijado en pantalla es el elemento que el operador ya ve: el enlace va dentro.
+  assert.equal(chip.style.position,'fixed','el chip sigue fijado en pantalla');
+  assert.equal(Number(chip.style.zIndex)>=1000,true,'el chip sigue por encima del marcador');
+  assert.equal(/rgb\(34, *34, *34\)|#222/i.test(chip.style.background),true,'el chip mantiene su fondo opaco');
+  for(const [name,state] of states) {
+   p.handlers['tatami:state'](state);
+   // 1. exactamente un enlace Manual
+   const links=[...p.doc.querySelectorAll('#integrated-mode a[href]')];
+   assert.equal(links.length,1,route+' / '+name+': exactamente un enlace de manual');
+   const link=links[0];
+   assert.equal(link.id,'integrated-manual',route+' / '+name+': identificable');
+   assert.equal(link.tagName,'A','es un enlace de navegacion, no un control');
+   assert.equal(link.textContent,'? Manual');
+   // 2. href exacto   3. target blank   4. rel correcto
+   assert.equal(link.getAttribute('href'),MANUAL,route+' / '+name+': href exacto');
+   assert.equal(link.getAttribute('target'),'_blank',route+' / '+name+': pestana nueva');
+   assert.equal(link.getAttribute('rel'),'noopener noreferrer',route+' / '+name+': rel exacto');
+   assert.match(link.getAttribute('aria-label')||'',/manual del Tatami/);
+   // 5. visible junto al chip de estado: es hijo del propio chip y no puede taparse
+   assert.equal(link.parentNode,chip,route+' / '+name+': el enlace vive DENTRO del chip');
+   assert.equal(link.style.position,'','no se posiciona por su cuenta');
+   assert.equal(/fff|255, *255, *255/i.test(link.style.color),true,route+' / '+name+': color explicito sobre fondo oscuro');
+   assert.equal(link.style.display!=='none'&&link.style.visibility!=='hidden',true,route+' / '+name+': sin display/visibility ocultos');
+   const chipText=chip.textContent;
+   assert.equal(chipText.startsWith('Integrated ·'),true,route+' / '+name+': el chip conserva su formato');
+   assert.match(chipText,/ready|running|paused|awaiting_result|finished|Waiting/,route+' / '+name+': el chip conserva el estado');
+   assert.equal(chipText.includes('? Manual'),true,route+' / '+name+': el repintado no borra el enlace');
+   // 6. ningun otro destino externo permitido
+   const externals=[...p.doc.querySelectorAll('#integrated-mode a[href^="http"]')].map(n=>n.getAttribute('href'));
+   assert.deepEqual(externals,[MANUAL],route+' / '+name+': unico destino externo permitido');
+   assert.equal(link.closest('form'),null,'no vive dentro de ningun formulario');
+  }
   assert.equal(p.registrations.filter(entry=>entry[1]==='integrated-manual').length,0,'el manual no registra handlers');
+  p.emits.length=0;
   p.handlers['tatami:state'](sides());
   assert.deepEqual(p.emits,[],'pintar el manual no emite ningun comando');
-  assert.equal(p.doc.querySelector('#integrated-mode').textContent.startsWith('Integrated ·'),true);
  }
+ // Guard: el adaptador sigue con un unico literal de URL (la excepcion estrecha del test 26).
+ const adapter=fs.readFileSync(path.join(__dirname,'../integrated-ui.js'),'utf8');
+ assert.deepEqual([...adapter.matchAll(/https?:\/\/[^'"`\s]+/g)].map(m=>m[0]),[MANUAL],'unico destino externo en el adaptador');
 });
