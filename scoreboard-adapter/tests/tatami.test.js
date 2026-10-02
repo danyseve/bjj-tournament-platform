@@ -108,11 +108,13 @@ test('16 el reloj nunca es negativo', () => {
  const s = assigned(); running(s, true); clock.value += 10 * 60 * 1000;
  assert.equal(s.snapshot().remaining_seconds, 0);
 });
-test('17 al llegar a cero el reloj deja de correr y el estado no es running', () => {
+test('17 al llegar a cero el reloj se detiene y el combate espera resultado', () => {
  const s = assigned(); running(s, true); clock.value += 300000;
  const state = s.snapshot();
- assert.equal(state.remaining_seconds, 0); assert.equal(state.status, 'finished'); assert.notEqual(state.status, 'running');
- clock.value += 60000; assert.equal(s.snapshot().remaining_seconds, 0); assert.equal(s.snapshot().status, 'finished');
+ assert.equal(state.remaining_seconds, 0); assert.equal(state.status, 'awaiting_result'); assert.notEqual(state.status, 'running');
+ assert.equal(state.winner_team_id, null); assert.equal(state.method, null, 'el tiempo agotado no decide ganador');
+ assert.equal(s.running(), false, 'el reloj autoritativo queda parado');
+ clock.value += 60000; assert.equal(s.snapshot().remaining_seconds, 0); assert.equal(s.snapshot().status, 'awaiting_result');
 });
 test('18 reset detiene el reloj, restaura duracion y scoring conservando sesion y participantes', () => {
  const s = assigned(); const session = s.snapshot().session_id;
@@ -163,15 +165,15 @@ test('20 payloads invalidos, operaciones y campos desconocidos son rechazados', 
  }
  assert.deepEqual(s.snapshot(), before);
 });
-test('21 acumulaciones absurdas y arranque tras finalizar son rechazados', () => {
+test('21 acumulaciones absurdas y arranque con el tiempo agotado son rechazados', () => {
  const s = assigned();
  for (let i = 0; i < 10; i += 1) assert.equal(score(s, 'a', 'points', 100).ok, true);
  assert.equal(s.snapshot().fighter_a.points, 1000);
  const overflow = score(s, 'a', 'points', 1);
  assert.equal(overflow.ok, false); assert.equal(overflow.code, 'invalid_operation'); assert.equal(s.snapshot().fighter_a.points, 1000);
- running(s, true); clock.value += 300000; assert.equal(s.snapshot().status, 'finished');
+ running(s, true); clock.value += 300000; assert.equal(s.snapshot().status, 'awaiting_result');
  const resume = running(s, true);
- assert.equal(resume.ok, false); assert.equal(resume.code, 'already_finished'); assert.equal(s.snapshot().status, 'finished');
+ assert.equal(resume.ok, false); assert.equal(resume.code, 'awaiting_result'); assert.equal(s.snapshot().status, 'awaiting_result');
 });
 async function server(t) {
  const a = require('../integrated').createServer(legacyRoot);
@@ -370,13 +372,16 @@ test('38 tras finalizar el scoring, el reloj y el reset son rechazados', () => {
  assert.deepEqual(s.snapshot(), frozen);
 });
 
-test('39 un combate acabado por reloj queda congelado y sin ganador registrado', () => {
+test('39 el tiempo agotado deja el resultado abierto y admite finish', () => {
  const s = assigned(); running(s, true); clock.value += 300000;
  const expired = s.snapshot();
- assert.equal(expired.status, 'finished'); assert.equal(expired.winner_team_id, null); assert.equal(expired.method, null);
+ assert.equal(expired.status, 'awaiting_result'); assert.equal(expired.winner_team_id, null); assert.equal(expired.method, null);
  const r = finish(s, 101, 'points');
- assert.equal(r.ok, false); assert.equal(r.code, 'already_finished');
- assert.deepEqual(s.snapshot(), expired, 'el resultado no se puede reescribir tras expirar el reloj');
+ assert.equal(r.ok, true, JSON.stringify(r));
+ const state = s.snapshot();
+ assert.equal(state.status, 'finished'); assert.equal(state.winner_team_id, 101); assert.equal(state.method, 'points');
+ assert.equal(state.remaining_seconds, 0, 'el resultado llega con el reloj ya agotado');
+ assert.equal(state.revision, expired.revision + 1, 'la revision sube una sola vez');
 });
 
 test('40 el enum de metodos del cliente coincide con el del servidor', () => {
@@ -421,4 +426,180 @@ test('42 una UI que se reconecta tras finalizar recibe el resultado final congel
  assert.equal(snapshot.revision, 2); assert.equal(snapshot.session_id, state.session_id);
  assert.equal(snapshot.remaining_seconds, 300); assert.equal(snapshot.fighter_a.points, 0);
  await controller.close(); await later.close();
+});
+
+const cleared = (s, state) => s.apply({...base(state === undefined ? s.snapshot() : state), operation: 'clear_match'});
+const expiredStore = () => {const s = assigned(); running(s, true); clock.value += 300000; return s;};
+const otherFixture = () => ({...fixture(), match_id: 41,
+ fighter_a: {...fixture().fighter_a, stage_item_input_id: 3, team_id: 201, name: 'Otra Ana'},
+ fighter_b: {...fixture().fighter_b, stage_item_input_id: 4, team_id: 202, name: 'Otra Bea'}});
+
+test('43 el tiempo agotado abre awaiting_result sin cerrar el resultado ni tocar el scoring', () => {
+ const s = assigned();
+ score(s, 'a', 'points', 6); score(s, 'b', 'advantages', 2); running(s, true);
+ const before = s.snapshot(); clock.value += 300000;
+ const state = s.snapshot();
+ assert.equal(state.status, 'awaiting_result'); assert.equal(state.remaining_seconds, 0);
+ assert.equal(state.winner_team_id, null); assert.equal(state.method, null);
+ assert.deepEqual([state.fighter_a.points, state.fighter_b.advantages], [6, 2], 'el scoring queda congelado y no se pierde');
+ assert.equal(state.revision, before.revision, 'agotar el tiempo no es una mutacion de comando');
+ assert.equal(s.running(), false, 'el reloj autoritativo queda parado');
+});
+
+test('44 con el tiempo agotado solo finish esta permitido', () => {
+ const s = assigned(); score(s, 'a', 'points', 1); running(s, true); clock.value += 300000;
+ const expired = s.snapshot();
+ const rejected = [score(s, 'a', 'points', 2), score(s, 'b', 'penalties', 1), running(s, true), running(s, false),
+  s.apply({...base(expired), operation: 'reset'})];
+ for (const r of rejected) {assert.equal(r.ok, false, JSON.stringify(r)); assert.equal(r.code, 'awaiting_result');}
+ assert.deepEqual(s.snapshot(), expired, 'ninguna mutacion toca un combate con el tiempo agotado');
+});
+
+test('45 finish resuelve awaiting_result conservando scoring y el reloj en cero', () => {
+ const s = assigned(); score(s, 'a', 'points', 3); score(s, 'b', 'penalties', 1); running(s, true); clock.value += 300000;
+ const expired = s.snapshot();
+ const r = s.apply({...base(expired), operation: 'finish', winner_team_id: 102, method: 'decision'});
+ assert.equal(r.ok, true); assert.equal(r.changed, true); assert.equal(r.revision, expired.revision + 1);
+ assert.equal(r.state.status, 'finished');
+ const state = s.snapshot();
+ assert.equal(state.status, 'finished'); assert.equal(state.winner_team_id, 102); assert.equal(state.method, 'decision');
+ assert.equal(state.remaining_seconds, 0); assert.equal(state.duration_seconds, 300);
+ assert.deepEqual([state.fighter_a.points, state.fighter_b.penalties], [3, 1]);
+ assert.equal(score(s, 'a', 'points', 1).code, 'already_finished', 'resuelto el resultado queda congelado');
+ assert.equal(s.apply({...base(state), operation: 'reset'}).code, 'already_finished');
+});
+
+test('46 finish desde awaiting_result valida ganador y metodo y no muta al rechazar', () => {
+ const s = expiredStore(); const expired = s.snapshot();
+ for (const winner of [1, 999, null, '101', 101.5, true]) {
+  const r = s.apply({...base(expired), operation: 'finish', winner_team_id: winner, method: 'points'});
+  assert.equal(r.ok, false, String(winner)); assert.equal(r.code, 'invalid_winner', String(winner));
+ }
+ for (const method of ['ko', '', 'SUB', null, 'submission ']) {
+  const r = s.apply({...base(expired), operation: 'finish', winner_team_id: 101, method});
+  assert.equal(r.ok, false, String(method)); assert.equal(r.code, 'invalid_method', String(method));
+ }
+ assert.deepEqual(s.snapshot(), expired);
+ assert.equal(finalState(s, 101, 'submission').status, 'finished');
+});
+
+test('47 el replay de finish no duplica ni reabre el combate agotado', () => {
+ const s = expiredStore();
+ const command = {...base(s.snapshot()), operation: 'finish', winner_team_id: 101, method: 'submission'};
+ const first = s.apply(command); const frozen = s.snapshot();
+ const replay = s.apply({...command});
+ assert.equal(replay.ok, true); assert.equal(replay.changed, false); assert.equal(replay.revision, first.revision);
+ assert.deepEqual(s.snapshot(), frozen);
+});
+
+test('48 clear_match no es valido mientras el resultado siga abierto', () => {
+ const ready = assigned();
+ const running1 = assigned(); score(running1, 'a', 'points', 2); running(running1, true);
+ const paused = assigned(); running(paused, true); running(paused, false);
+ const awaiting = expiredStore();
+ for (const [label, store] of [['ready', ready], ['running', running1], ['paused', paused], ['awaiting_result', awaiting]]) {
+  const before = store.snapshot();
+  const r = cleared(store, before);
+  assert.equal(r.ok, false, label); assert.equal(r.code, 'not_finished', label);
+  assert.deepEqual(store.snapshot(), before, label + ' no se toca');
+ }
+});
+
+test('49 clear_match tras finish vacia el tatami, sube una revision y emite estado vacio', () => {
+ const s = assigned(); const session = s.snapshot().session_id;
+ score(s, 'a', 'points', 5); const frozen = finalState(s, 101, 'submission');
+ const r = cleared(s, frozen);
+ assert.equal(r.ok, true); assert.equal(r.changed, true); assert.equal(r.revision, frozen.revision + 1);
+ assert.equal(r.state, null, 'el snapshot emitido es explicitamente vacio');
+ assert.equal(s.snapshot(), null); assert.equal(s.running(), false);
+ assert.equal(s.apply({...base(frozen), operation: 'reset'}).code, 'wrong_session', 'ya no hay sesion activa');
+ assert.equal(typeof session, 'string');
+});
+
+test('50 el registro de comandos desaparece con la sesion liberada', () => {
+ const s = assigned();
+ const scored = {...base(s.snapshot()), operation: 'score_delta', fighter: 'a', field: 'points', delta: 2};
+ s.apply(scored);
+ const frozen = finalState(s, 101, 'points');
+ const clear = {...base(frozen), operation: 'clear_match'};
+ assert.equal(s.apply(clear).ok, true);
+ for (const command of [scored, {...clear}]) {
+  const r = s.apply({...command});
+  assert.equal(r.ok, false); assert.equal(r.code, 'wrong_session');
+ }
+ assert.equal(s.snapshot(), null);
+});
+
+test('51 tras clear_match una asignacion nueva abre una sesion distinta y limpia', () => {
+ const s = assigned(); const first = s.snapshot();
+ score(s, 'a', 'points', 7); finalState(s, 102, 'walkover');
+ assert.equal(cleared(s).ok, true);
+ assert.equal(s.snapshot(), null);
+ const result = s.assign(otherFixture());
+ assert.equal(result.status, 201);
+ const state = s.snapshot();
+ assert.equal(state.match_id, 41); assert.equal(state.status, 'ready'); assert.equal(state.revision, 1);
+ assert.equal(state.remaining_seconds, state.duration_seconds);
+ assert.deepEqual([state.fighter_a.points, state.fighter_a.advantages, state.fighter_a.penalties], [0, 0, 0]);
+ assert.equal(state.winner_team_id, null); assert.equal(state.method, null);
+ assert.notEqual(state.session_id, first.session_id, 'sesion nueva');
+ assert.notEqual(state.fighter_a.team_id, first.fighter_a.team_id);
+});
+
+test('52 con la sesion abierta un combate distinto sigue dando 409 y la misma asignacion es replay', () => {
+ const s = assigned(); const payload = fixture();
+ assert.equal(s.assign(otherFixture()).status, 409, 'otro combate no puede entrar sin liberar');
+ assert.equal(s.assign({...payload}).status, 200, 'la misma asignacion es un replay idempotente');
+ assert.equal(s.snapshot().revision, 1);
+ assert.equal(s.assign({...otherFixture()}).status, 409);
+});
+
+test('53 clear_match exige el conjunto exacto de campos y datos coherentes', () => {
+ const s = assigned(); const frozen = finalState(s, 101, 'points');
+ const invalid = [
+  {...base(frozen), operation: 'clear_match', extra: 1},
+  {...base(frozen), operation: 'clear_match', tatami_id: 2},
+  {...base(frozen), operation: 'clear_match', match_id: frozen.match_id + 1},
+  {...base(frozen), operation: 'clear_match', session_id: 'otra-sesion'},
+ ];
+ for (const command of invalid) {const r = s.apply(command); assert.equal(r.ok, false, JSON.stringify(r));}
+ assert.equal(s.snapshot().revision, frozen.revision, 'ninguna variante invalida muta el combate');
+ assert.equal(cleared(s, frozen).ok, true);
+});
+
+test('54 clear_match por socket emite estado vacio y luego admite otro combate', async t => {
+ const {url} = await server(t), state = await assign(url);
+ const controller = await connect(url, cookie(CONTROL)), display = await connect(url);
+ await controller.poll(); await display.poll();
+ const finish = {...base(state), operation: 'finish', winner_team_id: 101, method: 'points'};
+ await controller.send('tatami:update', finish, 1);
+ assert.equal(acks(await controller.poll()).get(1).ok, true);
+ const conflict = await fetch(url + '/internal/tatamis/1/assignment', {method: 'PUT',
+  headers: {'content-type': 'application/json', 'x-internal-token': INTERNAL}, body: JSON.stringify(otherFixture())});
+ assert.equal(conflict.status, 409, 'sin liberar el tatami otro combate no entra');
+ const clear = {...base({...state, revision: 2}), operation: 'clear_match'};
+ await controller.send('tatami:update', clear, 2);
+ assert.deepEqual(acks(await controller.poll()).get(2), {ok: true, command_id: clear.command_id, revision: 3});
+ const broadcast = events(await display.poll()).filter(([event]) => event === 'tatami:state');
+ assert.deepEqual(broadcast.at(-1), ['tatami:state', null], 'el estado vacio se emite de forma explicita');
+ assert.equal((await (await fetch(url + '/internal/tatamis/1/state', {headers: {'x-internal-token': INTERNAL}})).json()).state, null);
+ const next = await assign(url, otherFixture());
+ assert.equal(next.status, 'ready'); assert.notEqual(next.session_id, state.session_id);
+ const ready = await display.poll();
+ const latest = events(ready).filter(([event]) => event === 'tatami:state').at(-1);
+ assert.equal(latest[1].match_id, 41); assert.equal(latest[1].revision, 1);
+ await controller.close(); await display.close();
+});
+
+test('55 clear_match exige credencial de control y no se puede disparar desde la pantalla', async t => {
+ const {url} = await server(t), state = await assign(url);
+ const controller = await connect(url, cookie(CONTROL)), display = await connect(url);
+ await controller.poll(); await display.poll();
+ const finish = {...base(state), operation: 'finish', winner_team_id: 102, method: 'other'};
+ await controller.send('tatami:update', finish, 1); await controller.poll();
+ const clear = {...base({...state, revision: 2}), operation: 'clear_match'};
+ await display.send('tatami:update', clear, 1);
+ assert.deepEqual(acks(await display.poll()).get(1), {ok: false, code: 'unauthorized', revision: 2});
+ assert.equal((await (await fetch(url + '/internal/tatamis/1/state', {headers: {'x-internal-token': INTERNAL}})).json()).state.status, 'finished');
+ await controller.close(); await display.close();
 });

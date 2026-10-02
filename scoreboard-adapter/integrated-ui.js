@@ -30,6 +30,10 @@
  const METHOD_LABELS = {points: 'Puntos', submission: 'Sumisión', decision: 'Decisión', disqualification: 'Descalificación',
   walkover: 'Walkover', referee_stoppage: 'Parada del árbitro', other: 'Otro'};
  const LOCKABLE = 'input,button,#start,#restart,[id^="add"],[id^="sub"]';
+ // Only an open fight accepts scoring or clock commands. With the time up the
+ // result is still pending, and after finish it is closed and frozen.
+ const LIVE = ['ready', 'running', 'paused'];
+ const PENDING = 'Tiempo finalizado — pendiente de resultado';
  // A control page owns the legacy scoring surface; the display page never does.
  const control = document.querySelector('#add4f1') !== null;
  const socket = io();
@@ -38,7 +42,9 @@
  let remaining = null;
  let sequence = 0;
  let armed = false;
+ let clearArmed = false;
  const panel = control === true ? buildFinishPanel() : null;
+ const clearPanel = control === true ? buildClearPanel() : null;
  const result = buildResult();
 
  function node(tag, id, text) {
@@ -67,6 +73,20 @@
   document.body.appendChild(root);
   return {root, winner, method, ask, open, confirm, cancel, filled: null};
  }
+ // A separate, explicit release surface: it is never merged with finalization and
+ // it is only usable once the result is closed, because releasing an open fight
+ // would throw a result away.
+ function buildClearPanel() {
+  const root = node('div', 'integrated-clear');
+  root.style.cssText = 'position:fixed;left:0;bottom:0;z-index:1000;background:#111;color:#fff;padding:6px 8px;font:14px sans-serif;display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+  const ask = node('span', 'clear-ask');
+  const open = node('button', 'clear-open', 'Liberar Tatami');
+  const confirm = node('button', 'clear-confirm', 'Confirmar liberación');
+  const cancel = node('button', 'clear-cancel', 'Cancelar');
+  root.append(open, ask, confirm, cancel);
+  document.body.appendChild(root);
+  return {root, ask, open, confirm, cancel};
+ }
  function buildResult() {
   const banner = node('div', 'integrated-result');
   banner.style.cssText = 'position:fixed;right:0;top:0;z-index:1000;background:#0b6;color:#fff;padding:4px 8px;font:14px sans-serif';
@@ -84,6 +104,13 @@
   const name = winnerName();
   if (name === null) return 'Finalizado · sin ganador registrado';
   return 'Finalizado · Ganador: ' + name + (state.method === null ? '' : ' · ' + methodLabel(state.method));
+ }
+ // The read-only display announces that the time is up without inventing a winner.
+ function resultText() {
+  if (state === null) return 'Tatami 1 libre — sin combate asignado';
+  if (state.status === 'finished') return finalText();
+  if (state.status === 'awaiting_result') return PENDING;
+  return '';
  }
  function fillWinner() {
   const previous = panel.winner.value;
@@ -111,11 +138,16 @@
   panel.method.disabled = live === false || armed === true;
   panel.open.disabled = live === false || armed === true || panel.winner.value === '' || panel.method.value === '';
   panel.open.style.display = armed === true || finished === true ? 'none' : '';
-  panel.ask.style.display = armed === true || finished === true ? '' : 'none';
+  // The pending notice is visible as soon as the clock runs out: the result is
+  // open and the operator is asked to close it.
+  const notice = armed === true || finished === true || (state !== null && state.status === 'awaiting_result');
+  panel.ask.style.display = notice === true ? '' : 'none';
   panel.confirm.style.display = armed === true ? '' : 'none';
   panel.cancel.style.display = armed === true ? '' : 'none';
   if (finished === true) panel.ask.textContent = finalText();
-  else if (armed === false) panel.ask.textContent = '';
+  else if (armed === true) panel.ask.textContent = '¿Finalizar como ganador ' + selectedName() + ' por ' + methodLabel(panel.method.value) + '?';
+  else if (state !== null && state.status === 'awaiting_result') panel.ask.textContent = PENDING;
+  else panel.ask.textContent = '';
  }
  function commandId() {
   const source = typeof globalThis.crypto === 'object' && globalThis.crypto !== null ? globalThis.crypto : null;
@@ -125,14 +157,26 @@
  }
  function active(id) {
   if (control !== true || state === null) return false;
-  // A finished match is frozen: scoring, clock and reset are locked for good.
-  if (state.status === 'finished') return false;
+  // Pending and closed results lock every mutation control: scoring, clock and
+  // reset answer only while the fight is open.
+  if (LIVE.includes(state.status) === false) return false;
   return Object.hasOwn(SCORING, id) || id === 'start' || id === 'restart';
+ }
+ function paintClear() {
+  if (clearPanel === null) return;
+  const cleared = state !== null && state.status === 'finished';
+  clearPanel.root.style.display = state === null ? 'none' : '';
+  clearPanel.open.disabled = cleared === false || clearArmed === true;
+  clearPanel.open.style.display = clearArmed === true ? 'none' : '';
+  clearPanel.ask.textContent = clearArmed === true ? '¿Liberar el Tatami? El resultado en memoria se perderá.' : '';
+  for (const element of [clearPanel.ask, clearPanel.confirm, clearPanel.cancel]) {
+   element.style.display = clearArmed === true ? '' : 'none';
+  }
  }
  function paint() {
   document.querySelectorAll(LOCKABLE).forEach(node => {
-   // The finalization controls live outside the legacy lock set.
-   if (node.closest('#integrated-finish') !== null) return;
+   // The finalization and release controls live outside the legacy lock set.
+   if (node.closest('#integrated-finish') !== null || node.closest('#integrated-clear') !== null) return;
    if (active(node.id) === true) {
     node.disabled = false;
     node.removeAttribute('disabled');
@@ -156,6 +200,7 @@
    if (start.tagName === 'BUTTON') start.textContent = running === true ? 'Pausa' : 'Iniciar';
   }
   paintFinish();
+  paintClear();
  }
  function waiting() {
   state = null;
@@ -166,13 +211,15 @@
   badge.textContent = 'Integrated · Waiting for assignment · ' + (control === true ? 'Control' : 'Read-only');
   document.querySelectorAll('input[id^="fighter-"]').forEach(input => {input.value = ''; input.placeholder = '';});
   document.querySelectorAll('.timer').forEach(node => {node.textContent = '--:--';});
-  result.textContent = '';
+  armed = false;
+  clearArmed = false;
+  result.textContent = resultText();
   paint();
  }
  function present() {
   badge.textContent = 'Integrated · ' + state.status + ' · ' + (control === true ? 'Control' : 'Read-only');
-  // The read-only display also reflects the final result, without controls.
-  result.textContent = state.status === 'finished' ? finalText() : '';
+  // The read-only display also reflects the pending or final result, without controls.
+  result.textContent = resultText();
   const seconds = state.remaining_seconds;
   const time = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
   document.querySelectorAll('.timer').forEach(node => {node.textContent = time;});
@@ -248,6 +295,20 @@
    armed = false;
    panel.ask.textContent = '';
    paintFinish();
+  });
+  // Releasing the tatami is its own two-step action, never a side effect of a
+  // finish and never available while the result is still open.
+  clearPanel.open.addEventListener('click', () => {
+   if (state === null || state.status !== 'finished') return;
+   clearArmed = true;
+   paintClear();
+  });
+  clearPanel.cancel.addEventListener('click', () => {clearArmed = false; paintClear();});
+  clearPanel.confirm.addEventListener('click', () => {
+   if (clearArmed !== true || state === null || state.status !== 'finished') return;
+   send('clear_match', {});
+   clearArmed = false;
+   paintClear();
   });
  }
 })();

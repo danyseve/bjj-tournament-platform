@@ -8,6 +8,12 @@ const {performance} = require('node:perf_hooks');
 // The integrated server owns the single source of truth of the live match:
 // fighters, scoring, status and the authoritative clock. Browsers only render
 // snapshots and send explicit commands; they never keep authoritative score.
+//
+// Status machine: ready -> running <-> paused -> awaiting_result -> finished.
+// awaiting_result means the clock ran out while the result is still open (no
+// winner recorded yet); finished means the result is closed and frozen. An
+// explicit clear_match empties the tatami, and only a finished match may be
+// cleared. Everything lives in memory: there is no persistence and no recovery.
 // ---------------------------------------------------------------------------
 
 const COMMAND_HISTORY = 256;  // bounded idempotency memory per active session
@@ -23,6 +29,7 @@ const OPERATIONS = {
  set_running: [...COMMAND_KEYS, 'running'],
  reset: [...COMMAND_KEYS],
  finish: [...COMMAND_KEYS, 'winner_team_id', 'method'],
+ clear_match: [...COMMAND_KEYS],
 };
 function exact(value, keys) {
  return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -61,10 +68,12 @@ function createStore(options = {}) {
   return Math.max(0, Math.ceil(anchor.seconds - (now() - anchor.at) / 1000));
  }
  // Expiry is derived from the monotonic clock, never from a per-second decrement.
+ // Reaching zero is not a closed result: the match waits for an explicit finish,
+ // so a winner can still be recorded afterwards.
  function advance() {
   if (active === null || anchor === null || remaining() > 0) return;
   active.remaining_seconds = 0;
-  active.status = 'finished';
+  active.status = 'awaiting_result';
   anchor = null;
  }
  function snapshot() {
@@ -90,9 +99,24 @@ function createStore(options = {}) {
   const previous = commands.get(command.command_id);
   if (previous !== undefined) return {...previous};
   if (command.expected_revision !== active.revision) return refuse('stale_revision');
+  // clear_match is the only way to leave a match behind, and it is valid only on
+  // a closed result: abandoning an open fight is refused.
+  if (command.operation === 'clear_match') {
+   if (active.status !== 'finished') return refuse('not_finished');
+   // The tatami goes empty: session, clock and the idempotency memory of that
+   // session disappear together, and no match is loaded automatically.
+   const revision = active.revision + 1;
+   active = null;
+   assignment = null;
+   commands = new Map();
+   anchor = null;
+   return {ok: true, command_id: command.command_id, revision, changed: true, state: null};
+  }
   // A finished match is frozen: no scoring, clock, reset or second finish may
   // touch it. Only a replay of an already accepted command answers (above).
   if (active.status === 'finished') return refuse('already_finished');
+  // Time is up but the result is still open: only finish may resolve it.
+  if (active.status === 'awaiting_result' && command.operation !== 'finish') return refuse('awaiting_result');
   let changed = false;
   if (command.operation === 'score_delta') {
    if (command.fighter !== 'a' && command.fighter !== 'b') return refuse('invalid_operation');

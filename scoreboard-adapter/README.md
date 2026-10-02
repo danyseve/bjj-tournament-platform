@@ -1,8 +1,8 @@
-# Scoreboard adapter — P2.3E
+# Scoreboard adapter — P2.3G
 
 Wrapper del repositorio principal; no modifica el submódulo. Documenta el
 contrato integrado de Tatami 1: el Bridge lo alimenta por la API interna y el
-servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.3F).
+servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.3G).
 
 ## Modos y límite de seguridad
 
@@ -107,13 +107,18 @@ el comando):
 - `reset`: detiene el reloj, restaura `remaining_seconds = duration_seconds`,
   pone scoring a 0, conserva combate, asignación, participantes y `session_id`,
   e incrementa `revision`.
-- `finish` no está implementado; `winner_team_id` y `method` siguen `null`.
+- `finish`: cierra el resultado (ver *Finalización local*).
+- `clear_match`: abandona el combate cerrado y deja el tatami vacío (ver
+  *Tiempo agotado y liberación del tatami*). Sin otras claves que las base.
 
 Ack de éxito `{ "ok": true, "command_id": "...", "revision": 7 }`; de error
 `{ "ok": false, "code": "stale_revision", "revision": 8 }`. Códigos:
 `invalid_command` (forma, claves o tipos), `invalid_operation` (operación no
 implementada o valor no permitido), `wrong_session`, `wrong_match`,
-`stale_revision`, `unauthorized`.
+`stale_revision`, `unauthorized`, `already_finished` (resultado cerrado y
+congelado), `awaiting_result` (reloj agotado y resultado pendiente),
+`not_finished` (`clear_match` sobre un resultado todavía abierto),
+`invalid_winner`, `invalid_method`.
 
 Idempotencia: cada `command_id` aceptado se recuerda (memoria acotada a 256
 comandos por sesión, se vacía al asignar). Un replay devuelve el ack original y
@@ -126,8 +131,9 @@ Reloj autoritativo: `remaining_seconds` es el valor congelado y el reloj guarda
 un ancla monotónica (`performance.now()`) al arrancar; cada snapshot calcula el
 restante real y al pausar se congela el calculado. No hay decremento por segundo
 como fuente temporal, no se admiten valores negativos y al llegar a 0 el estado
-pasa a `finished` con `remaining_seconds = 0`. No hay persistencia: reiniciar el
-proceso pierde el estado.
+pasa a `awaiting_result` con `remaining_seconds = 0` (el tiempo agotado **no**
+cierra el resultado: ver *Tiempo agotado y liberación del tatami*). No hay
+persistencia: reiniciar el proceso pierde el estado.
 
 ## Finalización local (P2.3F)
 
@@ -148,10 +154,9 @@ pasa a `finished`, se registran ganador y método, se conserva el scoring final 
 `session_id`, `revision` sube exactamente una vez y se emite el snapshot completo.
 Un combate `finished` queda congelado: `score_delta`, `set_running`, `reset` y un
 `finish` distinto se rechazan con `already_finished` sin mutar nada, y solo el
-replay del mismo `command_id` devuelve el ack original. Un combate agotado por
-reloj también termina `finished` (sin ganador registrado) y queda igualmente
-congelado: registrar un ganador a posteriori **no** está implementado (ver
-*Próximos pasos*).
+replay del mismo `command_id` devuelve el ack original. `finish` es válido desde
+`ready`, `running`, `paused` y `awaiting_result`; desde `awaiting_result` conserva
+`remaining_seconds = 0` y conserva el scoring.
 
 En `/control` y `/control2` hay un panel mínimo de finalización: seleccionar
 ganador y método, pulsar *Finalizar…* y confirmar en un segundo paso explícito
@@ -159,6 +164,60 @@ ganador y método, pulsar *Finalizar…* y confirmar en un segundo paso explíci
 bloqueados —y sus manejadores comprueban la autorización, no solo el aspecto— y
 se muestra el resultado. La pantalla `/` refleja el resultado final y sigue sin
 construir ningún control.
+
+## Tiempo agotado y liberación del tatami (P2.3G)
+
+Agotar el reloj y cerrar el resultado son hechos distintos, y el estado lo
+refleja con dos estados separados:
+
+```json
+{
+  "status": "awaiting_result",
+  "remaining_seconds": 0,
+  "winner_team_id": null,
+  "method": null
+}
+```
+
+`awaiting_result` significa *el tiempo terminó y el resultado sigue abierto*: el
+reloj queda parado en 0, el scoring queda congelado y no se inventa ganador. En
+ese estado solo se acepta `finish`; `score_delta`, `set_running` (`true` y
+`false`) y `reset` se rechazan con `awaiting_result` sin mutar nada. El `finish`
+que resuelve ese estado valida ganador y método igual que cualquier otro, cambia
+`awaiting_result → finished`, mantiene `remaining_seconds = 0`, conserva el
+scoring, sube `revision` exactamente una vez y emite el snapshot completo.
+
+`finished` sigue siendo el resultado **cerrado y congelado**: no admite ninguna
+mutación y solo responde al replay del mismo `command_id`. Para abandonar un
+combate cerrado existe una operación propia, separada de `reset`:
+
+- `clear_match`: solo válida sobre `finished` (en `ready`, `running`, `paused` o
+  `awaiting_result` se rechaza con `not_finished`). Al aceptarla se elimina el
+  estado activo, desaparece el `session_id` y su memoria de idempotencia, el
+  tatami queda vacío y se emite un `tatami:state` con payload `null` que
+  representa explícitamente *sin combate*. No se carga ningún match: la
+  asignación del siguiente combate es un acto aparte del Bridge.
+
+Requisito de orden: **primero `finish`, después `clear_match`**. Mientras haya un
+estado activo, `PUT /internal/tatamis/1/assignment` con otro match sigue
+devolviendo **409**; tras `clear_match` vuelve a aceptar (**201**) un combate
+distinto, con `session_id` nuevo, `revision` inicial 1, scoring a 0 y
+`status: "ready"`. `GET /internal/tatamis/1/state` devuelve `{ "state": null }`
+mientras el tatami esté libre.
+
+`clear_match` usa las seis claves base (sin ganador ni método) y exige la misma
+credencial de control que el resto de `tatami:update`: la pantalla `/` no puede
+liberar el tatami. En `/control` y `/control2` la liberación es un panel propio
+con dos pasos (pulsar *Liberar Tatami* y confirmar en un segundo acto explícito,
+que avisa de que el resultado en memoria se perderá); nunca se combina con
+finalizar en un solo botón y solo se habilita con el resultado ya cerrado. Con el
+tiempo agotado la UI bloquea scoring y reloj, muestra *Tiempo finalizado —
+pendiente de resultado* y deja el panel de finalización habilitado; `/` anuncia
+el tiempo agotado sin inventar ganador y sigue siendo solo lectura.
+
+Limitación: todo sigue **en memoria**. No hay persistencia en disco ni en base de
+datos, no se escribe nada en Bracket y reiniciar el proceso pierde el estado —
+incluido un combate liberado o un resultado cerrado.
 
 ## Control autorizado
 
@@ -207,8 +266,8 @@ NODE_PATH=/home/ubuntu/.cache/scoreboard-p23b/node_modules:/home/ubuntu/.cache/s
  --test scoreboard-adapter/tests/adapter.test.js scoreboard-adapter/tests/ui.test.js scoreboard-adapter/tests/tatami.test.js
 ```
 
-60 casos con `node:test` (18 `adapter.test.js`, 16 `ui.test.js` con jsdom, 26
-`tatami.test.js` del marcador canónico), HTTP real y Engine.IO/Socket.IO polling
+97 casos con `node:test` (18 `adapter.test.js`, 24 `ui.test.js` con jsdom, 55
+`tatami.test.js` del marcador canónico, finalización y liberación), HTTP real y Engine.IO/Socket.IO polling
 sin cliente adicional. Los tests de reloj inyectan un reloj monotónico falso, sin
 sleeps. El test de no-reset instrumenta el módulo en un VM únicamente en
 pruebas; no añade exports/endpoints de mutación al runtime. Evidencias verticales
@@ -218,17 +277,17 @@ los casos posteriores usan la suite completa anterior.
 Después de pasar tests, build manual con contexto raíz:
 
 ```sh
-docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3e-test .
+docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3g-test .
 ```
 
 ## Próximos pasos (no implementados)
 
-- Liberar o cargar el siguiente combate: la asignación de otro match sigue
-  bloqueada por el `409` de la instancia y no existe todavía una operación
-  explícita para liberar la sesión ni para decidir el ganador de un combate
-  agotado por reloj.
-- Persistencia y recuperación tras reinicio del proceso.
-- Mapeo del enum de métodos y del resultado hacia el modelo de Bracket.
+- Carga automática del siguiente combate: `clear_match` vacía el tatami, pero
+  quién elige y asigna el siguiente match sigue fuera del alcance.
+- Persistencia y recuperación tras reinicio del proceso: hoy un reinicio pierde
+  el estado completo, incluido el resultado pendiente o cerrado.
+- Mapeo del enum de métodos y del resultado hacia el modelo de Bracket: la
+  política de escritura de resultados **no** está resuelta ni decidida aquí.
 
 Solo los cuatro archivos JS del adapter entran en el contexto/runtime de la imagen;
 tests, docs y scripts de validación no se copian. El smoke test Python stdlib

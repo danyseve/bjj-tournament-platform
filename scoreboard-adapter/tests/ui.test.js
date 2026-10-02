@@ -369,3 +369,90 @@ test('UI20 la pantalla / refleja el resultado final y sigue siendo solo lectura'
  assert.equal(p.doc.querySelector('#integrated-result').textContent,'','una sesion nueva limpia el resultado');
  assert.equal(presentation(p).time,'05:00');
 });
+
+test('UI21 con el tiempo agotado la UI bloquea scoring y reloj y pide el resultado',async t=>{
+ const {url}=await running(t);
+ for(const route of ['/control','/control2']) {
+  const p=await page(url,route);
+  p.handlers['tatami:state']({...sides({points:2},{points:1}),status:'running',remaining_seconds:120});
+  assert.equal(p.doc.querySelector('#add4f1').disabled,false,route+' combate vivo');
+  p.handlers['tatami:state']({...sides({points:2},{points:1}),status:'awaiting_result',remaining_seconds:0,revision:6});
+  for(const id of ['add4f1','sub2f1','addadvf2','start','restart']) {
+   const n=p.doc.querySelector('#'+id);if(n===null)continue;
+   assert.equal(n.getAttribute('aria-disabled'),'true',route+' '+id);
+   if(n.matches('input,button'))assert.equal(n.disabled,true,route+' '+id);
+  }
+  assert.equal(p.doc.querySelector('#finish-winner').disabled,false,'el panel de finalizacion sigue habilitado');
+  assert.equal(p.doc.querySelector('#finish-method').disabled,false);
+  assert.equal(p.doc.querySelector('#finish-ask').textContent,'Tiempo finalizado — pendiente de resultado');
+  assert.equal(p.doc.querySelector('#clear-open').disabled,true,'no se libera sin cerrar el resultado');
+  assert.equal(presentation(p).time,'00:00');
+  assert.equal(p.doc.querySelector('#integrated-result').textContent,'Tiempo finalizado — pendiente de resultado');
+  p.emits.length=0;
+  for(const id of ['add4f1','start','restart'])click(p,id);
+  assert.deepEqual(p.emits,[],route+' sin mutaciones con el tiempo agotado');
+ }
+});
+
+test('UI22 desde pendiente la UI permite finalizar con confirmacion previa',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state']({...sides({points:2},{points:4}),status:'awaiting_result',remaining_seconds:0,revision:6});
+ select(p,'finish-winner','102');select(p,'finish-method','decision');
+ click(p,'finish-open');
+ assert.deepEqual(p.emits,[],'armar no emite');
+ assert.match(p.doc.querySelector('#finish-ask').textContent,/Bea/);
+ click(p,'finish-confirm');
+ assert.equal(p.emits.length,1);
+ assert.equal(p.emits[0][1].operation,'finish');
+ assert.equal(p.emits[0][1].winner_team_id,102);
+ assert.equal(p.emits[0][1].method,'decision');
+ assert.equal(p.emits[0][1].expected_revision,6);
+ p.handlers['tatami:state']({...sides({points:2},{points:4}),status:'finished',revision:7,remaining_seconds:0,winner_team_id:102,method:'decision'});
+ assert.match(p.doc.querySelector('#integrated-result').textContent,/Ganador: Bea/);
+ assert.equal(p.doc.querySelector('#finish-open').disabled,true);
+ assert.equal(p.doc.querySelector('#clear-open').disabled,false,'cerrado el resultado ya se puede liberar');
+ assert.equal(p.doc.querySelector('#finish-ask').textContent,'Finalizado · Ganador: Bea · Decisión');
+});
+
+test('UI23 liberar el Tatami exige confirmacion explicita y no se combina con finish',async t=>{
+ const {url}=await running(t),p=await page(url,'/control');
+ p.handlers['tatami:state']({...sides({points:4},{points:1}),status:'finished',revision:5,remaining_seconds:0,winner_team_id:101,method:'points'});
+ assert.equal(p.doc.querySelector('#clear-open').disabled,false);
+ p.emits.length=0;
+ click(p,'clear-open');
+ assert.deepEqual(p.emits,[],'el primer acto no emite');
+ assert.equal(p.doc.querySelector('#clear-confirm').style.display,'');
+ assert.equal(p.doc.querySelector('#finish-confirm').style.display,'none','liberar no arma la finalizacion');
+ assert.match(p.doc.querySelector('#clear-ask').textContent,/perderá/);
+ click(p,'clear-cancel');
+ assert.deepEqual(p.emits,[]);
+ assert.equal(p.doc.querySelector('#clear-confirm').style.display,'none');
+ click(p,'clear-open');click(p,'clear-confirm');
+ assert.equal(p.emits.length,1);
+ assert.equal(p.emits[0][0],'tatami:update');
+ assert.equal(p.emits[0][1].operation,'clear_match');
+ assert.deepEqual(Object.keys(p.emits[0][1]).sort(),['command_id','expected_revision','match_id','operation','session_id','tatami_id']);
+ assert.equal(p.emits[0][1].session_id,'synthetic-session-a');
+ click(p,'clear-confirm');
+ assert.equal(p.emits.length,1,'el segundo clic no reemite');
+ p.handlers['tatami:state'](null);
+ assert.match(presentation(p).mode,/Waiting/);
+ assert.equal(p.doc.querySelector('#integrated-result').textContent,'Tatami 1 libre — sin combate asignado');
+ assert.deepEqual(presentation(p).names,['','']);
+ assert.equal(p.doc.querySelector('#clear-open').disabled,true);
+});
+
+test('UI24 la pantalla / anuncia el tiempo agotado sin inventar ganador y nunca libera',async t=>{
+ const {url}=await running(t),p=await page(url,'/');
+ assert.equal(p.doc.querySelector('#integrated-clear'),null,'/ no construye el panel de liberacion');
+ assert.equal(p.doc.querySelector('#finish-open'),null,'/ no construye el panel de finalizacion');
+ p.handlers['tatami:state']({...sides({points:2},{points:4}),status:'awaiting_result',remaining_seconds:0,revision:4});
+ assert.equal(p.doc.querySelector('#integrated-result').textContent,'Tiempo finalizado — pendiente de resultado');
+ assert.deepEqual(presentation(p).names,['Ana','Bea']);
+ assert.equal(presentation(p).time,'00:00');
+ for(const n of p.doc.querySelectorAll('input,button,#start,#restart,[id^="add"],[id^="sub"]')) {
+  assert.equal(n.getAttribute('aria-disabled'),'true');
+  n.dispatchEvent(new p.w.Event('click',{bubbles:true}));
+ }
+ assert.deepEqual(p.emits,[],'solo lectura');
+});
