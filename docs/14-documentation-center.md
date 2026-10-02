@@ -8,8 +8,11 @@ genera las dos salidas: **sitio HTML** y **PDF descargables**.
 - Manual del árbitro (HTML): `https://docs.opsforge.cc/bjj/tatami/`
 - Manual Bracket (estructura): `https://docs.opsforge.cc/bjj/bracket/`
 - Guía rápida A4 (1 página): `https://docs.opsforge.cc/bjj/guia-rapida/`
+- Quick Start — Acceso a BJJ Vetusta / OpsForge (política de acceso):
+  `https://docs.opsforge.cc/bjj/quick-start/`
 - PDFs: `https://docs.opsforge.cc/manual-arbitro-tatami-v0.1.pdf`,
-  `guia-rapida-arbitro-tatami-v0.1.pdf`, `manual-bracket-v0.1.pdf`
+  `guia-rapida-arbitro-tatami-v0.1.pdf`, `manual-bracket-v0.1.pdf`,
+  `quick-start-acceso-opsforge-v0.1.pdf`
 
 ## Arquitectura
 
@@ -130,6 +133,12 @@ Observación (actualizada en P2.6B.1): las apps de `bjjvetusta`, `docs` y `brack
 modelo `login_method = One-Time PIN` (cualquier correo verificado por OTP, 24 h) por decisión del
 club; los tatamis mantienen allow-list explícita a 8 h. Ver `docs/11` §22.
 
+**Referencia operativa publicada**: la matriz de acceso, el flujo (`email -> OTP -> acceso`
+frente a `email autorizado -> OTP -> acceso`) y la gestión de árbitros están documentados en
+el propio centro, en `Quick Start — Acceso a BJJ Vetusta / OpsForge` (`/bjj/quick-start/`, PDF
+`/quick-start-acceso-opsforge-v0.1.pdf`). Las altas y bajas de árbitros se hacen **solo** con
+el procedimiento `cloudflare-bjj-access`, nunca tocando DNS, túnel, ingress ni nginx.
+
 ## Seguridad
 
 - Cero puertos inbound nuevos: solo se añadió un hostname.
@@ -173,4 +182,6 @@ tanto este centro de documentación sigue siendo **estático y desacoplado** de 
 
 Cada página y cada PDF llevan **versión, fecha, proyecto y estado** en su cabecera, tomados
 del front matter: el manual del árbitro y la guía rápida son `v0.1`, `2026-10-02`, proyecto
-`OpsForge · BJJ Vetusta / Asturkon`, estado `Draft`.
+`OpsForge · BJJ Vetusta / Asturkon`, estado `Draft`. El **Quick Start de acceso** es el único
+`Validated`: su matriz se verificó por read-back contra la API del proveedor, así que no
+documenta una intención sino el estado real de las cuatro aplicaciones.

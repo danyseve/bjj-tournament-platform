@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick Start — Acceso a BJJ Vetusta / OpsForge - Centro de documentacion OpsForge</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Centro de documentacion OpsForge</a>
+    <span class="sub">BJJ Vetusta / Asturkon</span>
+  </div>
+</header>
+<div class="wrap layout">
+  <nav class="side">
+    <p class="navtitle">Manuales</p>
+    <ul>
+<li><a href="/bjj/quick-start/" class="active">Quick Start — Acceso</a></li>
+<li><a href="/bjj/tatami/">Manual Tatami / Árbitro</a></li>
+<li><a href="/bjj/guia-rapida/">Guía rápida (A4)</a></li>
+<li><a href="/bjj/bracket/">Manual Bracket (estructura)</a></li>
+<li><a href="/bjj/organizador/">Manual Organizador (estructura)</a></li>
+    </ul>
+    <p class="navtitle">Ficheros</p>
+    <ul>
+      <li><a href="/#descargas">PDFs</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <div class="docmeta">
+      <span class="m"><b>Version</b> v0.1</span>
+      <span class="m"><b>Fecha</b> 2026-10-02</span>
+      <span class="m"><b>Proyecto</b> OpsForge · BJJ Vetusta / Asturkon</span>
+      <span class="m"><b>Estado</b> <span class="badge badge-validated">Validated</span></span>
+    </div>
+    <p class="pdflink">PDF: <a href="/quick-start-acceso-opsforge-v0.1.pdf">quick-start-acceso-opsforge-v0.1.pdf</a></p>
+    <h1 id="quick-start-acceso-a-bjj-vetusta-opsforge">Quick Start — Acceso a BJJ Vetusta / OpsForge</h1>
+<blockquote>
+<p><strong>Qué resuelve esta guía:</strong> cómo se entra a cada herramienta del torneo y en qué se diferencia el
+acceso del portal, la documentación y el cuadro (abierto a cualquier email verificado) del acceso
+de los tatamis (restringido a una allow-list). Es la referencia operativa permanente de la
+política de acceso.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Versión</strong></td>
+<td>v0.1</td>
+</tr>
+<tr>
+<td><strong>Fecha</strong></td>
+<td>2026-10-02</td>
+</tr>
+<tr>
+<td><strong>Proyecto</strong></td>
+<td>OpsForge · BJJ Vetusta / Asturkon</td>
+</tr>
+<tr>
+<td><strong>Estado</strong></td>
+<td>Validated — matriz verificada por read-back contra la API del proveedor</td>
+</tr>
+<tr>
+<td><strong>Alcance</strong></td>
+<td>Acceso a <code>bjjvetusta.</code>, <code>docs.</code>, <code>bracket.</code> y <code>tatami1..6.opsforge.cc</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-matriz-objetivo">1. Matriz objetivo</h2>
+<h3 id="portal-bjjvetustaopsforgecc">Portal — <code>bjjvetusta.opsforge.cc</code></h3>
+<ul>
+<li><strong>OTP abierto</strong>: entra cualquier dirección de email que complete correctamente el One-Time PIN.</li>
+<li><strong>Sin alta previa</strong>: no hay que autorizar el correo antes de entrar.</li>
+<li>Sesión: <strong>24 h</strong>.</li>
+</ul>
+<h3 id="documentacion-docsopsforgecc">Documentación — <code>docs.opsforge.cc</code></h3>
+<ul>
+<li><strong>OTP abierto</strong>: cualquier dirección de email que complete el One-Time PIN.</li>
+<li><strong>Sin alta previa</strong>.</li>
+<li>Sesión: <strong>24 h</strong>.</li>
+</ul>
+<h3 id="bracket-bracketopsforgecc">Bracket — <code>bracket.opsforge.cc</code></h3>
+<ul>
+<li><strong>OTP abierto</strong>: cualquier dirección de email que complete el One-Time PIN.</li>
+<li><strong>Sin alta previa</strong>.</li>
+<li>Sesión: <strong>24 h</strong>.</li>
+</ul>
+<h3 id="tatami-1-tatami1opsforgecc">Tatami 1 — <code>tatami1.opsforge.cc</code></h3>
+<ul>
+<li><strong>Allow-list explícita</strong>: solo los emails autorizados.</li>
+<li><strong>OTP</strong>: One-Time PIN por correo (la allow-list decide <em>quién</em>; el OTP, <em>cómo</em> se entra).</li>
+<li><strong>Alta previa obligatoria</strong> mediante el procedimiento <code>cloudflare-bjj-access</code>.</li>
+<li>Sesión: <strong>8 h</strong>.</li>
+</ul>
+<h3 id="tatamis-2-a-6-tatami26opsforgecc-cuando-existan">Tatamis 2 a 6 — <code>tatami2..6.opsforge.cc</code> (cuando existan)</h3>
+<ul>
+<li><strong>Mismo modelo restringido que Tatami 1</strong>: allow-list explícita, OTP, alta previa mediante
+  <code>cloudflare-bjj-access</code> y sesión de <strong>8 h</strong>.</li>
+</ul>
+<h2 id="2-tabla-resumen">2. Tabla resumen</h2>
+<table>
+<thead>
+<tr>
+<th>Hostname</th>
+<th>Modelo</th>
+<th>Alta previa</th>
+<th>Sesión</th>
+<th>Quién entra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bjjvetusta.opsforge.cc</code></td>
+<td>OTP abierto</td>
+<td>No</td>
+<td>24 h</td>
+<td>Cualquier email que complete el OTP</td>
+</tr>
+<tr>
+<td><code>docs.opsforge.cc</code></td>
+<td>OTP abierto</td>
+<td>No</td>
+<td>24 h</td>
+<td>Cualquier email que complete el OTP</td>
+</tr>
+<tr>
+<td><code>bracket.opsforge.cc</code></td>
+<td>OTP abierto</td>
+<td>No</td>
+<td>24 h</td>
+<td>Cualquier email que complete el OTP</td>
+</tr>
+<tr>
+<td><code>tatami1.opsforge.cc</code></td>
+<td>Allow-list + OTP</td>
+<td>Sí (<code>cloudflare-bjj-access</code>)</td>
+<td>8 h</td>
+<td>Solo los emails autorizados</td>
+</tr>
+<tr>
+<td><code>tatami2..6.opsforge.cc</code></td>
+<td>Allow-list + OTP</td>
+<td>Sí (<code>cloudflare-bjj-access</code>)</td>
+<td>8 h</td>
+<td>Solo los emails autorizados</td>
+</tr>
+</tbody>
+</table>
+<p>La diferencia es <strong>deliberada</strong>: portal, documentación y cuadro sirven contenido operativo sin datos
+de nadie (identificar al visitante basta); el tatami controla la mesa del combate y exige saber de
+antemano <em>quién</em> puede entrar.</p>
+<h2 id="3-flujo-de-acceso">3. Flujo de acceso</h2>
+<p><strong>Portal / Documentación / Bracket:</strong></p>
+<p><code>email → OTP → acceso</code></p>
+<p><strong>Tatamis:</strong></p>
+<p><code>email autorizado → OTP → acceso</code></p>
+<p>En los cuatro casos el primer paso es el login de Cloudflare Access: se abre el hostname, Access pide
+la dirección de email, envía un código de un solo uso, se introduce el código y la aplicación carga.</p>
+<blockquote>
+<p><strong>No confundir OTP abierto con acceso anónimo; Cloudflare Access sigue siendo obligatorio.</strong></p>
+</blockquote>
+<p>Un visitante anónimo (sin completar el OTP) no llega nunca a la aplicación: la petición se redirige
+al login de Access, también en las aplicaciones abiertas. El modelo abierto <strong>identifica</strong> al
+visitante; no lo exime de autenticarse.</p>
+<p>Detalle operativo: la sesión de Access es <strong>por hostname</strong> (no hay sesión única entre aplicaciones),
+así que al pasar del portal a la documentación o al cuadro se vuelve a pedir el OTP. Es el
+comportamiento actual, no un error.</p>
+<h2 id="4-gestion-de-arbitros">4. Gestión de árbitros</h2>
+<p>Las <strong>altas y bajas de árbitros y profesores</strong> (las identidades autorizadas de los tatamis) se hacen
+<strong>exclusivamente</strong> con el procedimiento <code>cloudflare-bjj-access</code>, que resuelve la aplicación por
+hostname exacto, lee antes de escribir y verifica el resultado con read-back:</p>
+<ul>
+<li><strong>Alta</strong>: <code>add tatami1.opsforge.cc</code> (el hostname del tatami que corresponda).</li>
+<li><strong>Baja</strong>: <code>remove</code> / <code>revoke</code> sobre el mismo hostname.</li>
+<li><strong>Auditoría del modelo</strong>: <code>audit</code>, que comprueba que los tatamis mantienen allow-list a 8 h y que
+  portal, documentación y cuadro siguen abiertos a 24 h.</li>
+<li><strong>Tatami nuevo</strong>: la app de Access se crea primero (<code>create-app</code>); publicarla (DNS, túnel, nginx)
+  es una tarea aparte y posterior.</li>
+</ul>
+<p><strong>No</strong> se gestionan árbitros modificando DNS, Tunnel, ingress ni nginx: esas capas enrutan tráfico,
+no autorizan personas, y un cambio ahí <strong>no</strong> da ni quita acceso. Los servicios internos (Bridge,
+base de datos, <code>/internal/*</code>) no tienen hostname público y no deben tenerlo.</p>
+<p>Las direcciones autorizadas <strong>no se versionan ni aparecen en informes</strong>: la herramienta enmascara
+las identidades en toda su salida.</p>
+<h2 id="5-como-comprobar-que-el-modelo-sigue-en-su-sitio">5. Cómo comprobar que el modelo sigue en su sitio</h2>
+<ul>
+<li><strong>Anónimo</strong>: abrir cualquiera de los cuatro hostnames en una ventana privada → debe aparecer el
+  login de Access, nunca la aplicación.</li>
+<li><strong>OTP abierto</strong>: con un correo <strong>no</strong> autorizado antes, portal, documentación y Bracket deben
+  permitir <strong>solicitar</strong> el código.</li>
+<li><strong>Restringido</strong>: ese mismo correo en <code>tatami1.opsforge.cc</code> debe quedar <strong>bloqueado</strong>.</li>
+<li><strong>Auditoría</strong>: <code>audit</code> de <code>cloudflare-bjj-access</code> sobre las cuatro aplicaciones.</li>
+</ul>
+<p>La configuración concreta (aplicaciones, policies, sesiones y sus identificadores) se registra en el
+repositorio, en <code>docs/14-documentation-center.md</code> y en <code>docs/11-demo-externa-cloudflare.md</code> §22.</p>
+    <p class="footer">Generado desde <code>bjj/quick-start.md</code>
+    (sha256 df5eff83bb3d) por <code>docs-site/build.py</code>.</p>
+  </main>
+</div>
+</body>
+</html>

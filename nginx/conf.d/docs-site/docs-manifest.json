@@ -8,8 +8,20 @@
       "date": "2026-10-02",
       "state": "Draft",
       "source": "index.md",
-      "sha256": "7a54e03741bf",
+      "sha256": "3818422a99a5",
       "pdf": null
+    },
+    {
+      "title": "Quick Start — Acceso a BJJ Vetusta / OpsForge",
+      "url": "/bjj/quick-start/",
+      "version": "v0.1",
+      "date": "2026-10-02",
+      "state": "Validated",
+      "source": "bjj/quick-start.md",
+      "sha256": "df5eff83bb3d",
+      "pdf": "quick-start-acceso-opsforge-v0.1.pdf",
+      "pdf_pages": 2,
+      "pdf_bytes": 7645
     },
     {
       "title": "Manual del Tatami / Árbitro",
@@ -58,5 +70,5 @@
       "pdf": null
     }
   ],
-  "built_from_commit": "c14b18c"
+  "built_from_commit": "d709f91"
 }

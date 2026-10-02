@@ -18,6 +18,7 @@ tatamis, cuadro del torneo y organización del evento.
 
 | Manual | Contenido | Estado |
 |---|---|---|
+| [Quick Start — Acceso a BJJ Vetusta / OpsForge](/bjj/quick-start/) | Cómo se entra a cada herramienta: matriz de acceso, flujo y gestión de árbitros (referencia permanente de la política de acceso) | Validated v0.1 |
 | [Manual del Tatami / Árbitro](/bjj/tatami/) | Mesa del tatami: acceso, marcador, reloj, puntos, ventajas, penalizaciones, finalizar, liberar y cancelar | Draft v0.1 |
 | [Guía rápida — Árbitro (A4)](/bjj/guia-rapida/) | Una página para imprimir y plastificar | Draft v0.1 |
 | [Manual de Bracket (estructura)](/bjj/bracket/) | Torneo, categorías, competidores, equipos, stages, cuadro, combates y resultados | Draft v0.1 |
@@ -25,6 +26,7 @@ tatamis, cuadro del torneo y organización del evento.
 
 ## Descargas
 
+- [Quick Start — Acceso a BJJ Vetusta / OpsForge v0.1 (PDF)](/quick-start-acceso-opsforge-v0.1.pdf)
 - [Manual del Tatami / Árbitro v0.1 (PDF)](/manual-arbitro-tatami-v0.1.pdf)
 - [Guía rápida — Árbitro Tatami v0.1 (PDF, A4)](/guia-rapida-arbitro-tatami-v0.1.pdf)
 - [Manual de Bracket v0.1 (PDF, estructura)](/manual-bracket-v0.1.pdf)
