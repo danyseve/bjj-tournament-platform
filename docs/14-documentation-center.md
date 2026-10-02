@@ -65,6 +65,9 @@ Detalles que importan (aprendidos en la primera ejecucion):
   `build.py` los translitera (`pdf_safe`) y avisa en consola.
 - Los esquemas SVG se publican en la version online; el PDF los omite (fpdf2 no los renderiza
   de forma fiable) y conserva la leyenda.
+- Los PDF fijan su fecha de creacion a la del front matter (`set_creation_date`): sin eso,
+  fpdf2 sella la hora del build, cada rebuild ensucia el repositorio y la salida deja de ser
+  reproducible. Con la fecha fija, dos builds seguidos dan el **mismo md5**.
 
 ## Despliegue
 

@@ -20,6 +20,7 @@ import html
 import json
 import re
 import subprocess
+from datetime import datetime
 import sys
 import unicodedata
 from pathlib import Path
@@ -231,6 +232,10 @@ def _pdf_shell(doc: dict) -> tuple[FPDF, float]:
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=mt)
     pdf.set_margins(m, mt, m)
+    # Fecha de creacion fija (la del front matter) para que el PDF sea reproducible
+    # byte a byte: sin esto, fpdf2 sella la hora del build y cada rebuild ensucia git.
+    yyyy, mm, dd = (int(x) for x in doc["date"].split("-"))
+    pdf.set_creation_date(datetime(yyyy, mm, dd, 0, 0, 0))
     pdf.set_title(pdf_safe(doc["title"]))
     pdf.set_author(pdf_safe(doc["project"]))
     pdf.set_creator("docs-site/build.py")
