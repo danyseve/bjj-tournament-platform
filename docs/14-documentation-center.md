@@ -104,7 +104,7 @@ Se publica **protegido por Cloudflare Access** (opción B). Análisis que lo sos
 
 | Criterio | Público (A) | Protegido (B, elegido) |
 | --- | --- | --- |
-| Conveniencia para el árbitro | Sin fricción | Un OTP por sesión larga (7 días) |
+| Conveniencia para el árbitro | Sin fricción | Un OTP por sesión (24 h) |
 | Exposición de procedimientos internos | Abierta: nombres de flujo, estados y métodos de victoria del club | Solo para identidades autorizadas |
 | Riesgo de que un enlace filtrado active comandos de tatami | Nulo (contenido estatico) | Nulo (contenido estatico) |
 | Coherencia con el resto de OpsForge | Rompe el patrón (Tatami 1 y BJJ ya van con Access) | Mantiene el patrón |
@@ -117,17 +117,18 @@ fricción con **sesión larga**.
 Configuración aplicada (app Access independiente, nunca `Everyone`, nunca wildcard):
 
 - App `OpsForge Documentation`, dominio `docs.opsforge.cc`, tipo self-hosted.
-- **1 identidad autorizada**, allow-list explícita, `decision=allow`, **sin** `login_method`
-  (nada de "cualquier correo verificado").
-- `session_duration=168h` (7 días), IdP `onetimepin` (OTP por correo).
+- Modelo de acceso **normalizado en P2.6B.1**: `login_method = One-Time PIN` (cualquier email que
+  complete OTP), `decision=allow`, 0 identidades explícitas. La configuración inicial (allow-list de
+  1 identidad, sin `login_method`) queda documentada en `docs/11` §21–§22.
+- `session_duration=24h` (desde P2.6B.1; antes 168 h), IdP `onetimepin` (OTP por correo).
 - La app se creó copiando las identidades de la app de Tatami 1 con
   `create-app-host --copy-from tatami1`: **ningún correo pasa por la línea de comandos ni
   aparece en la salida**. Para cambiar la lista, usa `access_admin.sh add/remove/check`
   (ver skill `cloudflare-bjj-access`); no edites DNS ni túnel para eso.
 
-Observación pre-existente (no tocada): la app de `bjjvetusta.opsforge.cc` mantiene su
-`login_method` (cualquier correo verificado por OTP). Es anterior a esta fase y su política
-queda intacta; se documenta como pendiente de decisión del club, no como cambio de P2.6A.3.
+Observación (actualizada en P2.6B.1): las apps de `bjjvetusta`, `docs` y `bracket` comparten el
+modelo `login_method = One-Time PIN` (cualquier correo verificado por OTP, 24 h) por decisión del
+club; los tatamis mantienen allow-list explícita a 8 h. Ver `docs/11` §22.
 
 ## Seguridad
 

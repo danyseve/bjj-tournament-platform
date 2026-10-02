@@ -504,10 +504,10 @@ Arquitectura final de publicación (**un hostname por aplicación publicable**):
 
 | Hostname | Qué sirve | App de Access | Sesión |
 |---|---|---|---|
-| `bjjvetusta.opsforge.cc` | Portal estático BJJ Vetusta / Asturkon | `BJJ Vetusta Manager` (OTP abierto — **DEUDA**) | 24 h |
-| `bracket.opsforge.cc` | Aplicación Bracket (`bracket:8400`) | `OpsForge BJJ Bracket` (allow-list explícita) | 24 h |
+| `bjjvetusta.opsforge.cc` | Portal estático BJJ Vetusta / Asturkon | `BJJ Vetusta Manager` (OTP abierto; normalizado en §22) | 24 h |
+| `bracket.opsforge.cc` | Aplicación Bracket (`bracket:8400`) | `OpsForge BJJ Bracket` (allow-list; → OTP abierto en §22) | 24 h |
 | `tatami1.opsforge.cc` | Scoreboard Tatami 1 y `/control` | `OpsForge Tatami 1` (allow-list) | 8 h |
-| `docs.opsforge.cc` | Centro de documentación | `OpsForge Documentation` (allow-list) | 168 h |
+| `docs.opsforge.cc` | Centro de documentación | `OpsForge Documentation` (allow-list; → OTP abierto en §22) | 168 h → 24 h |
 | `tatami2..6.opsforge.cc` | **no desplegados** (el portal los muestra PRÓXIMAMENTE) | — | — |
 
 `opsforge.cc` (landing) no se tocó, y no se usa `bjjvetusta.opsforge.cc/<app>` como acceso final.
@@ -536,10 +536,51 @@ Cambios:
 modo que cada aplicación mantiene su propia sesión: el equipo introduce el OTP **una vez por
 app** y caduca según su `session_duration`. No se promete SSO.
 
-**Deuda registrada** (hardening, para P2.6C): la app de `bjjvetusta` sigue aceptando **cualquier
-email verificado por OTP** (0 identidades explícitas). No se ha tocado en P2.6B.
+**Deuda registrada entonces** (hardening, para P2.6C): la app de `bjjvetusta` aceptaba **cualquier
+email verificado por OTP** (0 identidades explícitas) y no se tocó en P2.6B. **Resuelta en
+P2.6B.1 (§22)**: ese comportamiento pasa a ser el modelo deliberado de portal/docs/bracket.
 
 **Rollback**: restaurar `bjj.conf` desde `.../portal-<ts>/bjj.conf.original` (sha `7e9ccbe2`,
 idéntico a `git show HEAD:nginx/conf.d/bjj.conf` previo) y `docker exec bjj-nginx nginx -s reload`
 (sin recrear el contenedor). `bracket.opsforge.cc` **no se elimina**: el rollback devuelve Bracket
 a `bjjvetusta` sin perder el hostname nuevo.
+
+
+## 22. P2.6B.1 — Normalización de políticas Cloudflare Access (CLOSED ✅, 2026-10-02)
+
+Cambio acotado **solo a Cloudflare Access**: sin tocar aplicaciones, DNS, Tunnel ingress, nginx,
+GitHub, PostgreSQL, WireGuard, `WRITE` ni el estado de los tatamis.
+
+Matriz de acceso resultante (leída de la API y verificada por read-back):
+
+| Hostname | Modelo | Policy | Sesión | Identidades explícitas |
+|---|---|---|---|---|
+| `bjjvetusta.opsforge.cc` | OTP abierto | `Allow verified email via OTP` | 24 h | 0 |
+| `docs.opsforge.cc` | OTP abierto | `Allow verified email via OTP` | 24 h | 0 |
+| `bracket.opsforge.cc` | OTP abierto | `Allow verified email via OTP` | 24 h | 0 |
+| `tatami1.opsforge.cc` | allow-list explícita | `Allow authorised demo email` | 8 h | 1 |
+
+- **Portal / docs / bracket**: `cualquier email que complete One-Time PIN` → `ALLOW` mediante
+  `login_method = One-Time PIN` (IdP `onetimepin`), sesión 24 h. Se aplicó a `docs` (era allow-list
+  de 1 identidad con 168 h) y a `bracket` (era allow-list de 1 identidad); `bjjvetusta` **ya estaba**
+  en ese modelo y no se tocó.
+- **Tatamis**: modelo restringido (`email autorizado → OTP válido → acceso`), allow-list explícita,
+  8 h. `tatami1` no se modificó; `tatami2..6` se crearán igual (altas/bajas por el skill
+  `cloudflare-bjj-access`).
+- Prohibido en todas: `Everyone`, bypass, wildcard de email, wildcard de dominio y email explícito
+  en las apps abiertas.
+- La diferencia de seguridad es **deliberada**: portal/docs/bracket sirven contenido operativo sin
+  datos (un OTP identifica, no autoriza); los tatamis controlan el tatami y exigen autorización.
+- **Test anónimo**: los cuatro hostnames responden `302` al login de Access
+  (`www-authenticate: Cloudflare-Access`) desde Internet, sin credenciales → ningún acceso directo
+  sin autenticación.
+- **Test OTP (humano, pendiente)**: un correo no registrado antes debe poder **solicitar** OTP en
+  portal/docs/bracket y seguir **bloqueado** en `tatami1`.
+- **Sin efectos colaterales**: DNS (12 registros, sin cambios), ingress del túnel (5 reglas,
+  `warp-routing` intacto), nginx sin recargar (contenedor con el mismo `StartedAt` y
+  `RestartCount=0`), `BRACKET_RESULT_WRITE_ENABLED=false`, BD `2|25|10|16|c1ab44651e79` idéntica,
+  cero puertos nuevos.
+- **Emails**: ninguno se versiona ni aparece en informes; la herramienta de administración
+  enmascara las identidades en toda su salida.
+- **Rollback**: devolver `docs`/`bracket` al modelo restringido con `add <host> <email>` sobre la
+  policy abierta (allow-list explícita) y restaurar la sesión de `docs` a 168 h.

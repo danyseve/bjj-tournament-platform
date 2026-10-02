@@ -1,5 +1,14 @@
 # 02 - Roadmap por fases
 
+## Normalización de políticas Cloudflare Access — P2.6B.1 (CLOSED ✅, 2026-10-02)
+
+Commit `docs(access): align BJJ application access model`. Cambio **solo de Cloudflare Access**
+(sin tocar apps, DNS, ingress, nginx, GitHub, PostgreSQL, WireGuard, `WRITE` ni tatamis):
+`docs` y `bracket` pasan al modelo abierto (`login_method = One-Time PIN`, 24 h, 0 identidades
+explícitas) y `tatami1` mantiene su allow-list explícita a 8 h. Read-back de las cuatro apps,
+test anónimo (`302` a Access en los cuatro hostnames) y sin efectos colaterales. Detalle:
+`docs/11-demo-externa-cloudflare.md` §22.
+
 ## Portal operativo BJJ Vetusta y Bracket en hostname propio — P2.6B (CLOSED ✅, 2026-10-02)
 
 Commit `feat(portal): publish BJJ Vetusta operations hub`. `bjjvetusta.opsforge.cc` deja de ser
@@ -9,8 +18,9 @@ Access → DNS → ingress → nginx → validación de `bracket.`, después el 
 Sin tocar `opsforge.cc`/landing, sin WRITE, sin tocar PostgreSQL ni WireGuard, cero puertos
 nuevos. Detalle: `docs/11-demo-externa-cloudflare.md` §21.
 
-Pendiente de esta línea: **P2.6C** — hardening de accesos (la app de `bjjvetusta` sigue con OTP
-abierto: cualquier email verificado entra) y mejoras de UX del portal.
+Pendiente de esta línea: **P2.6C** — mejoras de UX del portal y roles. El hardening de accesos se
+resolvió en **P2.6B.1** (modelo deliberado: portal/docs/bracket con OTP abierto 24 h; tatamis con
+allow-list explícita 8 h).
 
 ## Centro de documentación OpsForge `docs.opsforge.cc` — P2.6A.3 (CLOSED ✅, 2026-10-02)
 
@@ -26,7 +36,8 @@ Markdown que genera el sitio HTML y los PDF, detrás de Cloudflare Access.
   Manual del Organizador. PDF descargables generados desde la misma fuente.
 - Access: app propia `OpsForge Documentation` (`docs.opsforge.cc`), OTP, sesión 7 días,
   *deny by default*, allow-list explícita de una identidad **copiada de la app de Tatami 1**
-  sin que ningún correo pase por la línea de comandos ni por la salida.
+  sin que ningún correo pase por la línea de comandos ni por la salida (modelo de acceso
+  normalizado después en P2.6B.1: OTP abierto, 24 h).
 - DNS: CNAME `docs.opsforge.cc` proxied al túnel `opsforge-oracle`; ingress con la regla nueva
   preservando `bjjvetusta`, `tatami1`, el catch-all y `warp-routing`.
 - Cero puertos inbound nuevos, cero cambios en Bracket/PostgreSQL/WireGuard/scoreboard,
