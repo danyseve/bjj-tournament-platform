@@ -257,13 +257,53 @@ Verificación adicional tras cerrar: `docker ps` sin cambios y
 3. **Cambio de nginx no aplicado** (diseñado y validado): sin él la demo no
    muestra el Tatami 1. Requiere autorización por ser un cambio en el frontal
    productivo (backup + `nginx -t` + recarga controlada).
-4. **Match 1 residual `ready`**: no existe operación soportada para liberar un
-   match `ready`. La UI ofrece "Liberar Tatami" (`clear_match`), pero
-   `scoreboard-adapter/state.js:253-255` sólo lo permite sobre un match
-   `finished`, y `assign()` devuelve 409 si ya hay asignación (`state.js:348`).
-   Blocker de UX para la demo; no se manipula `state.json` a mano.
+4. ~~**Match 1 residual `ready`**~~ **RESUELTO en P2.6A.1 (2026-10-02)**: la
+   operación administrativa `cancel_assignment` libera un combate asignado por
+   error que nunca ha arrancado (rama `command.operation === 'cancel_assignment'`
+   en `scoreboard-adapter/state.js`), y `/control` gana la acción separada
+   "Cancelar asignación" en dos pasos. El match 1 quedó liberado por ese flujo
+   soportado —estado `null`, persistido y conservado tras reinicio— sin tocar
+   `state.json` a mano ni forzar la máquina de estados; ver §17. El 409 de
+   `assign()` ya no bloquea la reasignación.
 
 ## 16. Resultado de P2.6A
 
 Preparación completa y verificada; publicación **no** realizada por los
 bloqueantes 1–3. Ver informe de fase.
+
+## 17. P2.6A.1 — operación administrativa `cancel_assignment` (CLOSED ✅, 2026-10-02)
+
+Desbloquea el match residual antes de publicar la demo. No toca Bracket, no
+escribe resultados, no modifica PostgreSQL, no abre puertos ni rutas HTTP
+nuevas: el comando viaja **sólo por Socket.IO** con la misma credencial de
+control que el resto de operaciones administrativas.
+
+Contrato (detalle en `scoreboard-adapter/README.md` y en sus tests):
+
+- Sólo se acepta sobre un match activo `ready`, con el reloj completo
+  (`remaining_seconds === duration_seconds`), el marcador a cero y sin ganador
+  ni método.
+- Rechaza `running`, `paused`, `awaiting_result` y `finished` (`not_ready`) y
+  cualquier `ready` con puntos, ventajas o penalizaciones (`not_clean`): no es
+  un atajo para cerrar un combate ni un bypass de `finish`.
+- Efecto: deja el tatami vacío (estado activo, `session_id`, reloj e historial
+  de comandos), persiste `state: null` y difunde `tatami:state` con `null`.
+- Idempotencia: repetir el mismo `command_id` responde el mismo ack sin volver a
+  mutar (memoria en proceso, acotada a ese `command_id`; tras un reinicio no hay
+  nada que cancelar y el reintento se rechaza con `wrong_session`).
+- UI: "Cancelar asignación" en `/control`, visible y habilitada sólo con un
+  combate `ready` intacto, con confirmación en dos pasos y separada de
+  "Liberar Tatami" (que sigue siendo la liberación posterior a `finish`).
+
+Evidencia del cierre sobre producción (2026-10-02):
+
+- Imagen release `danyseve1/bjj-scoreboard@sha256:6fe745874fffd1a83ede55c3716307e6829f2d51d6e385f8a4b5e3836b4c1c71`
+  (tag `375e26c-r1`), Compose pinneado por digest y recreado **sólo**
+  `scoreboard-tatami-1`; Bracket, Bridge, PostgreSQL, nginx y WireGuard con los
+  mismos IDs y sin reinicios.
+- Match 1: `ready/rev1` → `cancel_assignment` → ack `{ok:true, revision:2}`,
+  difusión `["tatami:state", null]`, estado `null`; tras reiniciar el contenedor
+  sigue `null`. Candidatos del torneo 1: 12, con match 1 de nuevo en la lista.
+- Cero escrituras a Bracket: `POST /tatamis/1/result` → 503
+  `result_write_disabled`; métricas del Bracket sin `POST`/`PUT`/`api/token`;
+  DB sin cambios (2/25/10/16/9/15, Alembic `c1ab44651e79`).

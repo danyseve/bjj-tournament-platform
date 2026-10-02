@@ -110,6 +110,8 @@ el comando):
 - `finish`: cierra el resultado (ver *Finalización local*).
 - `clear_match`: abandona el combate cerrado y deja el tatami vacío (ver
   *Tiempo agotado y liberación del tatami*). Sin otras claves que las base.
+- `cancel_assignment`: libera una asignación equivocada que nunca ha arrancado
+  (ver *Cancelación de una asignación en `ready`*). Sin otras claves que las base.
 
 Ack de éxito `{ "ok": true, "command_id": "...", "revision": 7 }`; de error
 `{ "ok": false, "code": "stale_revision", "revision": 8 }`. Códigos:
@@ -118,6 +120,8 @@ implementada o valor no permitido), `wrong_session`, `wrong_match`,
 `stale_revision`, `unauthorized`, `already_finished` (resultado cerrado y
 congelado), `awaiting_result` (reloj agotado y resultado pendiente),
 `not_finished` (`clear_match` sobre un resultado todavía abierto),
+`not_ready` (`cancel_assignment` fuera de un combate `ready`),
+`not_clean` (`cancel_assignment` con el marcador ya tocado),
 `invalid_winner`, `invalid_method`.
 
 Idempotencia: cada `command_id` aceptado se recuerda (memoria acotada a 256
@@ -215,9 +219,41 @@ tiempo agotado la UI bloquea scoring y reloj, muestra *Tiempo finalizado —
 pendiente de resultado* y deja el panel de finalización habilitado; `/` anuncia
 el tiempo agotado sin inventar ganador y sigue siendo solo lectura.
 
-Limitación: todo sigue **en memoria**. No hay persistencia en disco ni en base de
-datos, no se escribe nada en Bracket y reiniciar el proceso pierde el estado —
-incluido un combate liberado o un resultado cerrado.
+### Cancelación de una asignación en `ready` (P2.6A.1)
+
+`clear_match` no cubre el caso de un combate asignado por error y todavía sin
+empezar: `ready` no es `finished`, de modo que la liberación se rechaza. Para ese
+caso existe una operación propia, deliberadamente separada de `clear_match`:
+
+- `cancel_assignment`: solo válida sobre un combate activo `ready` con el reloj
+  intacto (`remaining_seconds === duration_seconds`), el marcador a cero y sin
+  ganador ni método. El resto de estados se rechaza sin mutar: `running`,
+  `paused`, `awaiting_result` y `finished` con `not_ready`, y un `ready` con
+  puntos, ventajas o penalizaciones con `not_clean`. No cierra combates ni
+  reabre resultados: no es un atajo de `finish`.
+- Efecto: el mismo vaciado que `clear_match` —desaparecen el estado activo, el
+  `session_id`, el reloj y el historial de comandos; se persiste `state: null` y
+  se difunde `tatami:state` con `null`—, pero sin haber tenido nunca un resultado
+  que perder.
+- Idempotencia: repetir el mismo `command_id` responde exactamente el mismo ack y
+  no vuelve a mutar. La memoria del reintento vive en proceso y solo cubre el
+  tatami ya vacío por esa cancelación; tras un reinicio no hay nada que cancelar
+  y el reintento se rechaza con `wrong_session`, también sin efecto.
+- Autorización y superficie: las seis claves base, la misma credencial de control
+  que `clear_match` y **solo por Socket.IO**; no se añade ninguna ruta HTTP. En
+  `/control` y `/control2` es un panel propio de dos pasos (*Cancelar asignación*
+  y confirmación en un segundo acto) que solo se muestra con un combate `ready`
+  intacto y que nunca se mezcla con *Liberar Tatami*, la liberación posterior a
+  `finish`.
+- Después de cancelar, la siguiente asignación vuelve a ser un
+  `PUT /internal/tatamis/1/assignment` normal: **201**, `session_id` nuevo,
+  `revision` inicial 1, scoring a 0 y `status: "ready"`.
+
+Limitación: el estado vive en memoria y, en el modo integrado, en el fichero
+`SCOREBOARD_STATE_FILE` (ver *Persistencia y recuperación del estado vivo*); el
+adapter no escribe nada en Bracket en ningún caso. Sin fichero de estado
+configurado, reiniciar el proceso pierde el estado —incluido un combate liberado
+o un resultado cerrado.
 
 ## Control autorizado
 

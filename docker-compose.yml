@@ -114,7 +114,7 @@ services:
   scoreboard-tatami-1:
     # P2.5C — imagen release (adapter con /health y persistencia) publicada y
     # fijada por digest (sin `build:`).
-    image: danyseve1/bjj-scoreboard@sha256:024f0d5bf14c0891b0a2e3f3766d74381768379bd6e8a1f055d99a3f3e33074e
+    image: danyseve1/bjj-scoreboard@sha256:6fe745874fffd1a83ede55c3716307e6829f2d51d6e385f8a4b5e3836b4c1c71
     container_name: scoreboard-tatami-1
     profiles: ["tatami1"]
     healthcheck:

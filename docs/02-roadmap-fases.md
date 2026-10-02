@@ -12,8 +12,30 @@ abierto; 8080, 8400, 8500, 3000 y 5432 filtrados → `new inbound ports opened =
 `BRACKET_RESULT_WRITE_ENABLED=false` intacto (503 `result_write_disabled`, cero PUT al Bracket).
 
 Pendiente para publicar: cuenta/dominio Cloudflare (túnel gestionado) o autorización de correos
-reales (Quick Tunnel con `--allowed-mail`), aplicar el cambio de nginx y resolver el match 1 residual
-en estado `ready` (blocker de UX: `clear_match` sólo actúa sobre un match `finished`).
+reales (Quick Tunnel con `--allowed-mail`) y aplicar el cambio de nginx. El match 1 residual en
+estado `ready` ya **no** es un pendiente: lo resolvió P2.6A.1.
+
+## Operación administrativa `cancel_assignment` — P2.6A.1 (CLOSED ✅, 2026-10-02)
+
+Commit `375e26c` `feat(scoreboard): allow safe ready assignment cancellation`. Nueva operación
+administrativa que libera un combate asignado por error que nunca ha arrancado, sin forzar la máquina
+de estados ni servir de atajo a `finish`: sólo se acepta sobre un match `ready` intacto (reloj
+completo, marcador a cero, sin resultado) y rechaza `running`, `paused`, `awaiting_result` y
+`finished` (`not_ready`) y cualquier `ready` con marcador (`not_clean`). Viaja **sólo por Socket.IO**
+con la credencial de control (sin rutas HTTP nuevas) y el reintento del mismo `command_id` responde el
+mismo ack sin volver a mutar. `/control` añade la acción separada "Cancelar asignación" en dos pasos,
+independiente de "Liberar Tatami" (post-`finish`). 16 tests nuevos → 144/144 verdes.
+
+Desplegado en producción sólo `scoreboard-tatami-1` con la imagen release
+`danyseve1/bjj-scoreboard@sha256:6fe745874fffd1a83ede55c3716307e6829f2d51d6e385f8a4b5e3836b4c1c71`
+(tag `375e26c-r1`, Compose pinneado por digest); Bracket, Bridge, PostgreSQL, nginx y WireGuard
+intactos (mismos IDs, sin reinicios). Match 1 liberado por el flujo soportado (estado `null`,
+`tatami:state null` difundido, persistido y conservado tras reinicio), candidatos del torneo 1 = 12
+con match 1 de nuevo incluido, cero escrituras a Bracket y DB sin cambios. Detalle:
+`docs/11-demo-externa-cloudflare.md` §17.
+
+Pendiente para la demo externa (P2.6A.2, **no ejecutado**): aplicar el cambio de rutas de nginx y
+publicar el Quick Tunnel autenticado por email/OTP.
 
 
 ## Cierre operativo P1.4 — CLOSED ✅ (2026-10-01)
