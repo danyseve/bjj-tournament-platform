@@ -1,6 +1,8 @@
 # Scoreboard adapter — P2.3E
 
-Wrapper del repositorio principal; no cambia el submódulo ni conecta Bridge.
+Wrapper del repositorio principal; no modifica el submódulo. Documenta el
+contrato integrado de Tatami 1: el Bridge lo alimenta por la API interna y el
+servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.3E).
 
 ## Modos y límite de seguridad
 
@@ -163,14 +165,15 @@ permanecen disponibles.
 ## Tests sin instalar globalmente
 
 Node 22.23.3 ARM64 y dependencias quedan aislados en
-`/home/ubuntu/.cache/scoreboard-p23b`. `npm ci --omit=dev --no-audit --no-fund`
+`/home/ubuntu/.cache/scoreboard-p23b` (jsdom, para la suite de UI, en
+`/home/ubuntu/.cache/scoreboard-p23c`). `npm ci --omit=dev --no-audit --no-fund`
 usa copias del package.json y lock originales del scoreboard (sin cambios).
 
 ```sh
 cd /home/ubuntu/projects/bjj-tournament-platform
-NODE_PATH=/home/ubuntu/.cache/scoreboard-p23b/node_modules \
+NODE_PATH=/home/ubuntu/.cache/scoreboard-p23b/node_modules:/home/ubuntu/.cache/scoreboard-p23c/node_modules \
  /home/ubuntu/.cache/scoreboard-p23b/node-v22.23.3-linux-arm64/bin/node \
- --test scoreboard-adapter/tests/adapter.test.js
+ --test scoreboard-adapter/tests/adapter.test.js scoreboard-adapter/tests/ui.test.js scoreboard-adapter/tests/tatami.test.js
 ```
 
 60 casos con `node:test` (18 `adapter.test.js`, 16 `ui.test.js` con jsdom, 26
@@ -178,12 +181,13 @@ NODE_PATH=/home/ubuntu/.cache/scoreboard-p23b/node_modules \
 sin cliente adicional. Los tests de reloj inyectan un reloj monotónico falso, sin
 sleeps. El test de no-reset instrumenta el módulo en un VM únicamente en
 pruebas; no añade exports/endpoints de mutación al runtime. Evidencias verticales
-red/green por caso en el cache (`01-red.tap` … `15-green.tap`).
+red/green por caso en el cache para el hito P2.3B (`01-red.tap` … `15-green.tap`);
+los casos posteriores usan la suite completa anterior.
 
 Después de pasar tests, build manual con contexto raíz:
 
 ```sh
-docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3b-test .
+docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3e-test .
 ```
 
 Solo los cuatro archivos JS del adapter entran en el contexto/runtime de la imagen;
