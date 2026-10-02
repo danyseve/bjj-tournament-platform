@@ -371,3 +371,113 @@ Rollback de esta preparación (sin tocar nada más): borrar
 puramente interno. Con la demo ya publicada, el kill switch es
 deshabilitar/eliminar la app de Access o el ingress de `tatami1` (§13), que solo
 afecta a Tatami y no toca `bjjvetusta`, nginx, la aplicación, la DB ni WireGuard.
+
+## 19. P2.6A.2 — Tatami 1 publicado tras Cloudflare Access (CLOSED ✅, 2026-10-02)
+
+`RESULT: P2.6A.2 — CLOSED ✅ (tatami1.opsforge.cc online behind Access)`
+
+Ejecutado en el orden seguro previsto (Access → DNS → ingress → prueba externa), sin abrir puertos
+inbound y sin tocar Bracket, PostgreSQL, la configuración de nginx ya preparada, WireGuard ni la app de
+Access de BJJ.
+
+### 19.1 Piezas de borde
+
+| Pieza | Estado final |
+|---|---|
+| App de Access | `OpsForge Tatami 1` (`02f673fb-…`), `self_hosted`, `tatami1.opsforge.cc`, sesión 8 h, IdP OTP, `auto_redirect_to_identity=true`, `app_launcher_visible=false` |
+| Política | 1 sola: `Allow authorised demo email`, `decision: allow`, `precedence: 1`, `include` con **una** identidad explícita, `require: []`, `exclude: []` — sin `Everyone`, sin wildcard, sin bypass |
+| DNS | 1 registro `CNAME` `tatami1.opsforge.cc` → `8885941a-4cc9-4e05-a302-e0228c9fd146.cargotunnel.com`, proxied, TTL auto. Zona 9 → 10 registros; apex, `www`, `bjjvetusta`, MX y SPF intactos |
+| Ingress del túnel | 3 reglas: `bjjvetusta.opsforge.cc → http://127.0.0.1:8080`, `tatami1.opsforge.cc → http://127.0.0.1:8080`, catch-all `http_status:404`; `warp-routing: {enabled: false}` preservado. Hash `2fd58df84be29e3d` → `7cb2d62465fe892a` |
+
+Permisos verificados con escrituras reales, no por scopes declarados: `POST` del registro DNS real
+(`success=true`) y `PUT` idempotente de la config exacta del túnel (hash idéntico) antes de tocar nada.
+
+### 19.2 Intercepción anónima y sesión real
+
+Desde fuera, sin sesión, con el DNS local ya correcto: `302` a
+`https://insierto.cloudflareaccess.com/cdn-cgi/access/login/tatami1.opsforge.cc…` en `/`, `/control`,
+`/manifest.json` y el handshake `/socket.io/?EIO=4&transport=polling`, sin servir contenido del
+marcador. `bjjvetusta.opsforge.cc` sigue con el mismo comportamiento.
+
+OTP y navegación confirmados por el usuario sobre `https://tatami1.opsforge.cc` y
+`https://tatami1.opsforge.cc/control`: scoreboard externo cargado, `/control` cargado y Tatami 1 en
+estado libre. El correo autorizado no se registra en este documento.
+
+### 19.3 Viewer y assets (por HTTPS, contra el origen real)
+
+Por `Host: tatami1.opsforge.cc` en el frontal: `/` `200` (`BJJ Scoreboard`), `/control` `200`
+(`BJJ Scoreboard control`), `/manifest.json` `200` `application/json` (812 B) y todos los assets
+`200` con su tipo correcto — `/css/{bootstrap.min,all,scoreboard}.css`, `/js/{main,jquery-3.3.1.slim.min,bootstrap.min}.js`, `/socket.io/socket.io.js` y las imágenes. Se valida contenido real, no sólo el
+código de estado (la SPA del Bracket responde `200` a cualquier ruta del server por defecto).
+
+### 19.4 Socket.IO / WebSocket
+
+- Handshake polling `200` con `sid` (20 caracteres) y `upgrades: ["websocket"]`.
+- Upgrade WebSocket **101** con `Sec-WebSocket-Accept` verificado; trama Engine.IO `open`, conexión de
+  namespace y recepción de `tatami:state` por el canal de upgrade.
+- Ping de Engine.IO respondido con pong y reconexión limpia: segunda conexión con `sid` nuevo y
+  distinto.
+- No se cierra la fase con un `200` de HTTP: la difusión de estado se comprueba en el propio socket.
+
+### 19.5 Prueba funcional segura (asignar → validar → cancelar)
+
+- Inicio: `state = null`.
+- `candidates` del torneo 1: **12**; elegido el match **7** (Team 5 vs Team 8, categoría `Group B`,
+  `duration_seconds 600`).
+- `assign-match` → `201` `status=assigned`, `scoreboard_sent=true`.
+- Externo/estado: `ready`, `revision 1`, mismo match, mismos luchadores y categoría, duración 600 s con
+  reloj **sin arrancar** (`remaining 600`), marcador **0–0** (puntos, ventajas y penalizaciones a cero),
+  sin ganador. Match excluido de candidatos (11 restantes). El mismo combate aparece en `/control`.
+- Sin iniciar reloj, sin sumar puntos, sin ventajas, sin penalizaciones, sin finalizar, sin ganador y
+  sin publicar resultado.
+- `cancel_assignment` por el canal soportado → ack `{ok:true, revision:2}`, difusión
+  `["tatami:state", null]`, estado `null`; el reintento con el mismo `command_id` devuelve el mismo ack
+  sin volver a mutar; el match 7 vuelve a candidatos (**12**) y la interfaz queda libre.
+
+### 19.6 Gate de escritura
+
+`BRACKET_RESULT_WRITE_ENABLED=false` antes y después. `POST /tatamis/1/result` con cuerpo válido y
+**sesión viva** → `503` `status=failed` `reason=result_write_disabled`. Bracket: **0 `PUT`** y **0
+`POST /api/token`** en la ventana (la prueba no llega a escribir). El estado del tatami queda `null`.
+
+### 19.7 Seguridad de exposición
+
+- Puertos publicados por Docker: sólo `8080` (nginx), `8400` (Bracket) y `51820/udp` (WireGuard) —
+  idéntico al baseline previo. `scoreboard:3000`, `bridge:8500` y `postgresql:5432` **no** publicados.
+- Sockets a la escucha en el host: los mismos de siempre (`22`, `8080`, `8400`, `111`, resolución local
+  y un UDP de WireGuard). **Cero puertos inbound nuevos.**
+- WireGuard intacto: mismo contenedor, `restarts=0`, `StartedAt` sin cambios.
+- Access obligatorio: la app cubre el hostname completo y no hay rutas sin política.
+
+### 19.8 Regresión de BJJ
+
+`bjjvetusta.opsforge.cc` resuelve, sigue devolviendo `302` a Access y su policy **no** se ha tocado
+(app `e6f0fd31-…`, 1 política, sesión 24 h). Bracket carga por ese hostname (`/api/ping` → `"ping"`,
+SPA `200`). Cero cambios.
+
+### 19.9 Kill switch (solo Tatami)
+
+Retirado temporalmente el ingress de `tatami1` (hash de vuelta al original `2fd58df84be29e3d`) y
+restaurado después (`7cb2d62465fe892a`), con read-back en ambos sentidos. Durante el corte:
+`bjjvetusta` sin cambios, túnel `healthy` con 4 conectores y contenedores, nginx y DB intactos.
+Matiz honesto: como Access se evalúa en el borde **antes** de enrutar al túnel, una petición anónima no
+puede distinguir el ingress retirado (sigue viendo el `302` de Access, lo que mantiene el *deny by
+default*); la evidencia del corte es el read-back de la configuración del túnel, que deja el origen sin
+ruta y devolvería el `http_status:404` del catch-all a cualquier sesión válida. Restaurado y verificado
+(`302` de nuevo).
+
+### 19.10 Logs y estado final
+
+Revisión de `cloudflared` (unidad systemd activa, 4 conexiones HA, 94 peticiones), nginx (0 `5xx`,
+8 upgrades `101`, 0 errores), scoreboard (0 errores, 0 reconexiones), bridge (0 errores, 1 `503`
+esperado del gate) y bracket (0 `5xx`, 0 tracebacks). Barrido de secretos sobre los cuatro logs: cero
+apariciones de credenciales de control o internas y cero menciones de OTP.
+
+Estado final: `tatami1.opsforge.cc` **online** detrás de Access, túnel `healthy`, contenedores
+`healthy`, Tatami `state=null`, `WRITE=false`, DB intacta (2 torneos / 25 matches / 10 equipos / 16
+rondas, Alembic `c1ab44651e79`) y BJJ intacto.
+
+> Manual operativo del árbitro pendiente; antes de entregar /control a usuarios finales se publicará
+> documentación online y PDF.
+
+Siguiente fase (no ejecutada): **P2.6A.3 — centro de documentación `docs.opsforge.cc`**.

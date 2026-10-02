@@ -1,5 +1,33 @@
 # 02 - Roadmap por fases
 
+## Publicación externa del Tatami 1 tras Cloudflare Access — P2.6A.2 (CLOSED ✅, 2026-10-02)
+
+Commit `feat(demo): publish tatami 1 behind cloudflare access`. Tatami 1 publicado en
+`tatami1.opsforge.cc` detrás de Cloudflare Access, en el orden Access → DNS → ingress → prueba
+externa, sin abrir puertos inbound y sin tocar Bracket, PostgreSQL, la configuración de nginx ya
+preparada, WireGuard ni la app de Access de BJJ. App de Access propia por hostname
+(`OpsForge Tatami 1`, self-hosted, OTP, 8 h, *deny by default*, allow-list explícita de **una** sola
+identidad, sin `Everyone` y sin wildcard); `CNAME` proxied de `tatami1` al túnel `opsforge-oracle`
+(zona 9 → 10 registros, resto intacto); ingress `tatami1.opsforge.cc → http://127.0.0.1:8080`
+añadido preservando `bjjvetusta.opsforge.cc` y el catch-all `http_status:404` (hash
+`2fd58df84be29e3d` → `7cb2d62465fe892a`). Los permisos de escritura se verificaron con escrituras
+reales y read-back, no por scopes declarados.
+
+Validación de punta a punta: anónimo interceptado por Access (`302`) en `/`, `/control`,
+`/manifest.json` y el handshake de Socket.IO, sin servir contenido; OTP y navegación reales
+confirmados por el usuario; viewer y `/control` con assets servidos por HTTPS; Socket.IO con upgrade
+WebSocket `101`, `tatami:state` recibido, ping/pong y reconexión con `sid` nuevo; asignación de prueba
+(match 7 → `ready` con 0–0 y reloj sin arrancar) cancelada por `cancel_assignment` (ack
+`{ok:true, revision:2}`, estado `null` y match de vuelta a candidatos); gate de escritura cerrado
+(`503 result_write_disabled` con sesión viva, **0 `PUT`** y **0 `POST /api/token`** en Bracket);
+regresión de `bjjvetusta` sin cambios; kill switch por retirada del ingress (solo Tatami) probado y
+restaurado. Logs sin `5xx`, sin errores de WebSocket, sin bucles de reconexión y sin secretos ni OTP.
+Detalle: `docs/11-demo-externa-cloudflare.md` §19.
+
+Siguiente: **P2.6A.3 — centro de documentación `docs.opsforge.cc`** (manual del Tatami online, PDF
+descargable, guía rápida A4, estructura para el manual de Bracket y enlaces futuros desde el portal
+BJJ). **No ejecutado.**
+
 ## Publicación segura de la demo externa — P2.6A (preparado, NO publicado · 2026-10-02)
 
 Documento: **`docs/11-demo-externa-cloudflare.md`**. Diseño y validación de la publicación de la
