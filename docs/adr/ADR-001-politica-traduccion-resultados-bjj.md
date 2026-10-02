@@ -8,6 +8,11 @@
   `services/bracket` en `e6abd7d282850f9d13d9122494767d4dbcb139ef`.
 - Alcance: documentación de diseño. No se escribe en Bracket, no se toca PostgreSQL,
   Compose, `.env`, nginx ni WireGuard, y no se añade ningún `PUT` de resultados.
+- Actualización **P2.4C.1** (2026-10-02): **DEF-01 y DEF-02 corregidos** en el
+  submódulo (`47bc129d467a9544edd835aacbd49b5879e8adf6`), publicados en el fork
+  propio. DEF-03 y DEF-04 siguen abiertos. La corrección **no está desplegada**:
+  la imagen en producción sigue construida sobre `e6abd7d`. Sigue **sin existir**
+  escritura desde el Bridge.
 
 ## 1. Contexto
 
@@ -206,13 +211,12 @@ Campos a **leer antes** y reenviar tal cual para no destruirlos:
 
 - `round_id` (obligatorio; sale del match actual — `routes/matches.py:170` ya usa
   `match.round_id`, así que debe ser el mismo).
-- `court_id` — **obligatorio con valor no nulo** (DEF-02). Si el match no tiene
-  pista, el PUT falla con 500: hay que programar el combate antes o bloquear.
-- `custom_duration_minutes` y `custom_margin_minutes` — obligatorios con valor no
-  nulo; si el match no tiene valores personalizados, reenviar los defaults del
-  torneo no es equivalente (cambiaría el significado "personalizado"), pero
-  enviar `None` es imposible. Decisión pendiente: copiar el valor efectivo del
-  torneo y asumir que el match pasa a tener duración explícita.
+- `court_id` — admite `None` desde P2.4C.1 (DEF-02 corregido): `None` ⇒ SQL NULL,
+  así que se puede reenviar el valor actual del match sin inventar pistas.
+- `custom_duration_minutes` y `custom_margin_minutes` — admiten `None` desde
+  P2.4C.1: `None` ⇒ SQL NULL, que es el significado real "sin duración
+  personalizada"; el match pasa a usar la duración/margen del torneo
+  (`sql/matches.py:100-109`).
 - Los scores actuales (para detectar cambios de terceros antes de escribir).
 
 No hace falta reenviar `position_in_schedule`, `start_time`, `created` ni
@@ -282,7 +286,12 @@ los scores antiguos): un PUT a ciegas puede pisar el trabajo de otro operador.
 ## 11. Defectos conocidos
 
 - **DEF-01 — `and` de Python en las dependencias (heredado de upstream,
-  `f03bf6c` "Various bugfixes (#77)").** Sigue presente:
+  `f03bf6c` "Various bugfixes (#77)"). CORREGIDO en P2.4C.1** (submódulo
+  `47bc129`): `round_dependency` y `match_dependency` acotan por la cadena
+  `rounds.stage_item_id → stage_items.stage_id → stages.tournament_id` (ni
+  `matches` ni `rounds` tienen columna `tournament_id`) y `team_dependency` por
+  `teams.tournament_id`, con `&` en lugar de `and`. Análisis original (estado
+  previo al arreglo):
   `routes/util.py:24` (`rounds.c.id == round_id and matches.c.tournament_id ==
   tournament_id`), `:67` (`match_dependency`) y `:84` (`team_dependency`). La
   evaluación de SQLAlchemy hace que `bool(<clause>)` sea `False`, así que `A and B`
@@ -310,14 +319,18 @@ los scores antiguos): un PUT a ciegas puede pisar el trabajo de otro operador.
     es el **alcance por torneo del recurso**, no el control de acceso. Aun así,
     es un motivo fuerte para arreglarlo (o para re-validar el `tournament_id` del
     match en el Bridge) antes de habilitar escrituras.
-- **DEF-02 — `StatementError` si `court_id`/`custom_*` van a `None`.**
+- **DEF-02 — `StatementError` si `court_id`/`custom_*` van a `None`. CORREGIDO en
+  P2.4C.1** (submódulo `47bc129`): `sql_update_match` declara los parámetros de
+  bind de forma explícita, así que `None` llega como SQL NULL sin inventar ceros.
+  Análisis original:
   `models/db/shared.py:9-11` (exclude_none) + `sql/matches.py:85-118` (SET con
   bind params nombrados). Verificado:
   `model_dump() con court_id=None -> ['round_id', 'stage_item_input1_score',
   'stage_item_input2_score']` y al ejecutar la sentencia con esos valores:
   `StatementError: A value is required for bind parameter 'court_id'`. ⇒ 500 y
   ningún match sin pista puede actualizarse por esta vía.
-- **DEF-03 — el PUT no es transaccional.** La actualización commitea antes de
+- **DEF-03 — el PUT no es transaccional. SIGUE PENDIENTE tras P2.4C.1** (el
+  alcance de esa fase no lo requería). La actualización commitea antes de
   recalcular la clasificación y de propagar el ganador (`routes/matches.py:168-183`,
   sin `database.transaction()`): un fallo posterior deja marcador escrito y
   clasificación/árbol sin actualizar.
@@ -338,9 +351,11 @@ los scores antiguos): un PUT a ciegas puede pisar el trabajo de otro operador.
    (opción C), en el Bridge.
 4. **Descartar la opción D** mientras no exista un campo donde marcar el dato como
    sintético: hoy un score artificial es indistinguible del real.
-5. **Arreglar DEF-01 y DEF-02 antes** de habilitar cualquier escritura: sin
-   `court_id`, el PUT no funciona, y sin el filtro de torneo el alcance del recurso
-   queda flojo.
+5. ~~Arreglar DEF-01 y DEF-02 antes de habilitar cualquier escritura~~ **HECHO en
+   P2.4C.1** (submódulo `47bc129`, publicado en el fork propio): el PUT acepta ya
+   `None` legítimos y el recurso queda acotado al torneo de la ruta. La corrección
+   **no está desplegada** (la imagen en producción sigue en `e6abd7d`), así que no
+   debe habilitarse una escritura real desde el Bridge hasta reconstruir la imagen.
 6. **Prerrequisitos operativos** para P2.4D: el combate debe estar `finished` con
    `winner_team_id` y método; debe tener `court_id` asignado; el PUT debe ir con
    `round_id`, `court_id`, `custom_duration_minutes` y `custom_margin_minutes`
@@ -359,3 +374,7 @@ deciden en este ADR**:
 
 Hasta que esas dos preguntas tengan respuesta, la política por defecto es la más
 conservadora: **solo caso A automático, el resto manual y bloqueado**.
+
+Estado tras P2.4C.1: el gate de hardening queda cerrado (DEF-01 y DEF-02
+corregidos y publicados), pero **P2.4D sigue sin implementarse** y la escritura
+desde el Bridge continúa deshabilitada (**501**).

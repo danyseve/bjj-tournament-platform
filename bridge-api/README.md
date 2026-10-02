@@ -204,6 +204,12 @@ Diseño, no implementación: **no existe ningún `PUT` de resultados** y el endp
 sigue en 501. La política está documentada y justificada con el código real de
 Bracket en `docs/adr/ADR-001-politica-traduccion-resultados-bjj.md`.
 
+Nota de P2.4C.1 (hardening previo, sin escritura): en el submódulo Bracket
+(`47bc129`, publicado en el fork propio) quedan corregidos **DEF-01** (alcance por
+torneo en las dependencias de recurso) y **DEF-02** (`None` legítimos en el
+`UPDATE`). **DEF-03** (PUT no transaccional) sigue pendiente. La imagen en
+producción todavía no incluye el arreglo y este Bridge **no** escribe resultados.
+
 Resumen operativo:
 
 - Bracket solo representa **dos enteros**; el ganador es
