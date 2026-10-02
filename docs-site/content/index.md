@@ -53,5 +53,12 @@ tatami.
 - Bracket: `https://bjjvetusta.opsforge.cc`
 - Repositorio: `https://github.com/danyseve/bjj-tournament-platform` (privado)
 
-*Manual operativo del árbitro pendiente; antes de entregar `/control` a usuarios finales se
-publicará documentación online y PDF.*
+## Pendiente de integración (P2.6B)
+
+- El **portal BJJ** (`bjjvetusta.opsforge.cc`) enlazará a cada manual y a su PDF desde sus
+  botones de Tatami 1–6, Bracket y Manuales. Hoy el acceso es directo por URL.
+- La pantalla de `/control` del tatami llevará un enlace `? Manual` a
+  `/bjj/tatami/`, como cambio atómico propio (no se ha tocado la UI del marcador).
+
+*Este centro de documentación se mantiene desde el repositorio
+(`docs-site/`, una sola fuente Markdown para HTML y PDF).*

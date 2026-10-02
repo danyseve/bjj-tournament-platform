@@ -8,7 +8,7 @@
       "date": "2026-10-02",
       "state": "Draft",
       "source": "index.md",
-      "sha256": "669b85a73148",
+      "sha256": "c6b0cee8c0d7",
       "pdf": null
     },
     {
@@ -58,5 +58,5 @@
       "pdf": null
     }
   ],
-  "built_from_commit": "7ff2210"
+  "built_from_commit": "99b2418"
 }
