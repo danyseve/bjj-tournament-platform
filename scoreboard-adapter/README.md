@@ -102,7 +102,7 @@ Después de pasar tests, build manual con contexto raíz:
 docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3b-test .
 ```
 
-Solo los tres archivos JS del adapter entran en el contexto/runtime de la imagen;
+Solo los cuatro archivos JS del adapter entran en el contexto/runtime de la imagen;
 tests, docs y scripts de validación no se copian. El smoke test Python stdlib
 `tests/runtime_smoke.py` se ejecuta desde host contra el contenedor temporal,
 administra su red propia y hace cleanup en finally. Su evidencia JSON queda en
