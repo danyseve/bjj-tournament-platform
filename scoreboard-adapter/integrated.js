@@ -8,6 +8,7 @@ const logger = require('morgan');
 const createError = require('http-errors');
 const {Server} = require('socket.io');
 const {createStore} = require('./state');
+const {createStateFile} = require('./state-store');
 
 // Control credential cookie: a separate secret from the Bridge internal token.
 // It is delivered only to the control pages as HttpOnly (page scripts never
@@ -34,7 +35,18 @@ function cookieValue(header, name) {
 // Reuse legacy modules without importing app.js (which starts its own server).
 function createServer(legacyRoot = '/app') {
  const app = express();
- const store = createStore();
+ // Optional persistence. Without SCOREBOARD_STATE_FILE the integrated server keeps
+ // behaving exactly as before (memory only) and the standalone app is untouched.
+ const statePath = process.env.SCOREBOARD_STATE_FILE || '';
+ const stateFile = statePath.length > 0 ? createStateFile({file: statePath}) : null;
+ const store = createStore({persist: stateFile === null ? undefined : document => stateFile.save(document)});
+ if (stateFile !== null) {
+  // Recovery happens before the server listens: an unreadable, corrupt or
+  // unexpected document aborts startup instead of booting an empty tatami over
+  // a real one, and the bad file is left exactly as it was found.
+  const stored = stateFile.load();
+  if (stored !== undefined) store.restore(stored);
+ }
  // Internal API is fail-closed: without a configured token every /internal request is refused.
  // The browser/UI never receives this token; only the Bridge uses it.
  const internalToken = process.env.SCOREBOARD_INTERNAL_TOKEN || '';
@@ -104,6 +116,9 @@ function createServer(legacyRoot = '/app') {
   const result = store.assign(req.body);
   if (result.status === 400) return res.status(400).json({error: 'Invalid normalized assignment'});
   if (result.status === 409) return res.status(409).json({error: 'Tatami already has an active assignment'});
+  // 503: the assignment could not be persisted, so it was rolled back and is not
+  // announced as delivered (nothing is emitted to the clients either).
+  if (result.status === 503) return res.status(503).json({error: 'State could not be persisted'});
   io.emit('tatami:state', store.snapshot());
   res.status(result.status).json({state: result.state});
  });

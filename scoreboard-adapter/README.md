@@ -1,8 +1,8 @@
-# Scoreboard adapter — P2.3G
+# Scoreboard adapter — P2.4B
 
 Wrapper del repositorio principal; no modifica el submódulo. Documenta el
 contrato integrado de Tatami 1: el Bridge lo alimenta por la API interna y el
-servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.3G).
+servidor integrated es la fuente autoritativa del combate en vivo (P2.3A-P2.4B).
 
 ## Modos y límite de seguridad
 
@@ -263,11 +263,13 @@ usa copias del package.json y lock originales del scoreboard (sin cambios).
 cd /home/ubuntu/projects/bjj-tournament-platform
 NODE_PATH=/home/ubuntu/.cache/scoreboard-p23b/node_modules:/home/ubuntu/.cache/scoreboard-p23c/node_modules \
  /home/ubuntu/.cache/scoreboard-p23b/node-v22.23.3-linux-arm64/bin/node \
- --test scoreboard-adapter/tests/adapter.test.js scoreboard-adapter/tests/ui.test.js scoreboard-adapter/tests/tatami.test.js
+ --test scoreboard-adapter/tests/adapter.test.js scoreboard-adapter/tests/ui.test.js scoreboard-adapter/tests/tatami.test.js scoreboard-adapter/tests/persistence.test.js
 ```
 
-97 casos con `node:test` (18 `adapter.test.js`, 24 `ui.test.js` con jsdom, 55
-`tatami.test.js` del marcador canónico, finalización y liberación), HTTP real y Engine.IO/Socket.IO polling
+123 casos con `node:test` (18 `adapter.test.js`, 24 `ui.test.js` con jsdom, 55
+`tatami.test.js` del marcador canónico, finalización y liberación, 26
+`persistence.test.js` de persistencia y recuperación con filesystem temporal),
+HTTP real y Engine.IO/Socket.IO polling
 sin cliente adicional. Los tests de reloj inyectan un reloj monotónico falso, sin
 sleeps. El test de no-reset instrumenta el módulo en un VM únicamente en
 pruebas; no añade exports/endpoints de mutación al runtime. Evidencias verticales
@@ -277,19 +279,116 @@ los casos posteriores usan la suite completa anterior.
 Después de pasar tests, build manual con contexto raíz:
 
 ```sh
-docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.3g-test .
+docker build -f docker/scoreboard/Dockerfile -t bjj-scoreboard:p2.4b-test .
 ```
+
+## Persistencia y recuperación del estado vivo (P2.4B)
+
+Opt-in por variable de entorno, sin ruta productiva hardcodeada:
+
+```sh
+SCOREBOARD_STATE_FILE=/ruta/al/state.json
+```
+
+- sin la variable: comportamiento idéntico al anterior (todo en memoria) y el
+  modo standalone intacto;
+- con la variable: cada mutación aceptada se escribe **antes** de su ack.
+
+El I/O de disco vive solo en `state-store.js`; `state.js` construye y valida el
+documento y llama al sink inyectado, así que la lógica del marcador no conoce el
+sistema de ficheros.
+
+### Documento versionado
+
+```json
+{"schema_version": 1, "saved_at": "2026-10-02T10:00:00.000Z", "clock": {"wall_anchor": 1759400000000},
+ "state": {}, "command_history": [{"command_id": "...", "ack": {}}]}
+```
+
+- `state`: exactamente el marcador canónico (session_id, revision, tatami_id,
+  tournament_id, match_id, luchadores con scoring, categoría, duración, restante,
+  status, ganador y método) o `null` si el tatami está vacío;
+- `clock.wall_anchor`: instante de pared en ms al que corresponde
+  `state.remaining_seconds` mientras el combate corre; `null` con el reloj parado;
+- `command_history`: memoria de idempotencia acotada (256 entradas, solo comandos
+  aceptados).
+
+Nunca se persisten tokens, cookies, sockets, configuración ni nada del resultado
+en Bracket. Los datos de los tests son sintéticos.
+
+### Escritura atómica
+
+Temporal en el mismo directorio, `write` + `fsync`, `rename` sobre el fichero
+final, permisos `0600` y fsync best-effort del directorio. Nunca se escribe el
+fichero final a medias y no se generan backups ilimitados: un `rename` fallido
+deja intacto el documento anterior y limpia el temporal.
+
+### Orden y política de fallo
+
+`estado nuevo -> persistir -> publicar/ack`. Si la escritura falla, el comando se
+revierte en memoria (scoring, revision, historial y ancla vuelven al valor
+anterior) y la operación responde `persist_failed`; un assignment nuevo responde
+**503** y no se emite nada por el socket. Nunca se finge éxito.
+
+### clear_match
+
+Persiste `state: null` explícito y vacía `command_history`; el fichero se conserva
+(no se borra), lo que distingue "nunca inicializado" (sin fichero) de
+"explícitamente vacío" (`state: null`) y de "corrupto" (arranque fallido).
+
+### Recovery al arranque (integrated + SCOREBOARD_STATE_FILE)
+
+Antes de escuchar:
+
+- fichero inexistente -> tatami vacío normal;
+- documento válido -> estado recuperado (misma session_id, misma revision,
+  scoring, ganador y método);
+- `state: null` -> tatami vacío;
+- JSON corrupto, `schema_version` desconocida o estructura inválida -> **no
+  arranca**: `launcher.js` registra el motivo y sale con código 1, y el fichero
+  se deja tal cual estaba (jamás se sobrescribe con un estado vacío).
+
+### Recuperación del reloj
+
+`performance.now()` no sobrevive a un reinicio: el documento guarda
+`remaining_seconds` y el `wall_anchor` del mismo instante.
+
+```text
+elapsed   = Date.now() - wall_anchor
+remaining = max(0, remaining_seconds - elapsed)
+```
+
+Después se crea un ancla monotónica nueva, que vuelve a mandar. Si
+`remaining <= 0` al restaurar, el combate se restaura como `awaiting_result` con
+el reloj parado, nunca como `running`, y `finish` sigue siendo la única salida.
+La expiración del reloj en vivo (ticker) no se persiste: se recalcula idéntica en
+el siguiente arranque y se escribe con el siguiente comando aceptado.
+
+### Idempotencia entre reinicios
+
+El historial acotado de `command_id` aceptados se persiste, así que un replay
+posterior al reinicio devuelve el mismo ack (`changed: false`) sin reaplicar
+scoring, `finish` ni `reset`. Los comandos rechazados no se persisten. Tras un
+reinicio el mismo assignment sigue siendo **200** y otro combate sigue siendo
+**409**: la ocupación del tatami no se pierde.
+
+### Socket.IO y UI
+
+El estado recuperado viaja por el mismo contrato `tatami:state`, así que un
+cliente que conecte después del reinicio recibe el snapshot sin saber que hubo
+reinicio y la UI no necesita cambios.
 
 ## Próximos pasos (no implementados)
 
 - Carga automática del siguiente combate: `clear_match` vacía el tatami, pero
   quién elige y asigna el siguiente match sigue fuera del alcance.
-- Persistencia y recuperación tras reinicio del proceso: hoy un reinicio pierde
-  el estado completo, incluido el resultado pendiente o cerrado.
+- Política de traducción del resultado BJJ hacia Bracket (P2.4C): decidir y
+  documentar cómo se traduce `winner_team_id`/`method` al modelo de Bracket antes
+  de implementar ninguna escritura.
 - Mapeo del enum de métodos y del resultado hacia el modelo de Bracket: la
   política de escritura de resultados **no** está resuelta ni decidida aquí.
 
-Solo los cuatro archivos JS del adapter entran en el contexto/runtime de la imagen;
+Solo los cinco archivos JS del adapter entran en el contexto/runtime de la imagen;
 tests, docs y scripts de validación no se copian. El smoke test Python stdlib
 `tests/runtime_smoke.py` se ejecuta desde host contra el contenedor temporal,
 administra su red propia y hace cleanup en finally. Su evidencia JSON queda en

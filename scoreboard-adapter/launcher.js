@@ -9,5 +9,14 @@ function start(legacyRoot = '/app') {
  server.listen(process.env.PORT || 3000);
  return server;
 }
-if (require.main === module) start();
+if (require.main === module) {
+ try {
+  start();
+ } catch (error) {
+  // Fail closed: a state document that cannot be trusted stops the process with a
+  // clear reason instead of starting an empty scoreboard over the stored state.
+  console.error('scoreboard: refusing to start:', error && error.message ? error.message : error);
+  process.exit(1);
+ }
+}
 module.exports = {start};
