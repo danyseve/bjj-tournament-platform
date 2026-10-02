@@ -112,9 +112,9 @@ services:
     restart: unless-stopped
 
   scoreboard-tatami-1:
-    # P2.5C — imagen release (adapter con /health y persistencia) publicada y
-    # fijada por digest (sin `build:`).
-    image: danyseve1/bjj-scoreboard@sha256:6fe745874fffd1a83ede55c3716307e6829f2d51d6e385f8a4b5e3836b4c1c71
+    # P2.6C — imagen release (adapter con /health, persistencia y enlace al manual)
+    # publicada y fijada por digest (sin `build:`).
+    image: danyseve1/bjj-scoreboard@sha256:b4a53fe8d80f1f46b16972631276d439f7f323a9b93fc1f34f2576f3edcaec73
     container_name: scoreboard-tatami-1
     profiles: ["tatami1"]
     healthcheck:
