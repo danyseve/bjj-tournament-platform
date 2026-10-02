@@ -105,11 +105,10 @@ services:
       SCOREBOARD_TATAMI_1_URL: ${SCOREBOARD_TATAMI_1_URL:?obligatoria}
       SCOREBOARD_INTERNAL_TOKEN: ${SCOREBOARD_INTERNAL_TOKEN:?obligatoria}
       BRACKET_RESULT_WRITE_ENABLED: ${BRACKET_RESULT_WRITE_ENABLED:?obligatoria}
-      # Credenciales de escritura en Bracket: OPCIONALES a proposito. Con
-      # WRITE=false el Bridge arranca sin ellas; con WRITE=true su ausencia falla
-      # en cerrado (503 bracket_write_not_configured) sin escribir nada.
-      BRACKET_WRITE_USERNAME: ${BRACKET_WRITE_USERNAME:-}
-      BRACKET_WRITE_PASSWORD: ${BRACKET_WRITE_PASSWORD:-}
+      # Credenciales de escritura en Bracket: AUSENTES a proposito (P2.7B). El
+      # codigo las lee con default vacio y solo en la ruta de escritura: con
+      # WRITE=true su ausencia falla en cerrado (503 bracket_write_not_configured)
+      # sin escribir nada; con WRITE=false no las necesita.
     # Sin `ports`: nadie necesita el Bridge desde el host en este release. El
     # acceso es exclusivamente interno por bjj-net (nginx sigue igual).
     networks:
