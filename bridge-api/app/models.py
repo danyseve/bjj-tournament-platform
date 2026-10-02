@@ -43,6 +43,7 @@ class AssignMatchRequest(BaseModel):
 
 
 class AssignMatchResponse(BaseModel):
-    status: Literal["normalized"] = "normalized"
-    scoreboard_sent: Literal[False] = False
+    status: Literal["assigned", "replayed"]
+    scoreboard_sent: Literal[True] = True
     match: NormalizedMatch
+    state: dict

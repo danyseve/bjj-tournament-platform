@@ -1,7 +1,8 @@
-# BJJ Bridge API — P2.3A
+# BJJ Bridge API — P2.3A / P2.3D
 
-Capa de lectura y normalización entre Bracket y BJJ-Scoreboard. **No envía
-combates al scoreboard ni escribe resultados en Bracket en esta fase.**
+Capa de lectura y normalización entre Bracket y BJJ-Scoreboard. Desde P2.3D
+entrega además la asignación normalizada al scoreboard integrado del **Tatami 1**
+por HTTP; **sigue sin escribir resultados en Bracket**, al que solo hace `GET`.
 
 ## Configuración de la URL
 
@@ -13,7 +14,19 @@ No se cambia ninguna configuración de producción como parte de P2.3A.
 
 La consulta de stages envía `no_draft_rounds=true`, tiene timeout de 10 segundos,
 no sigue redirecciones y no intenta autenticarse. Un torneo no público puede
-responder 401/403. Solo se realizan solicitudes GET.
+responder 401/403. A Bracket solo se realizan solicitudes GET.
+
+## Scoreboard (Tatami 1)
+
+`SCOREBOARD_TATAMI_1_URL` es la base del scoreboard del Tatami 1
+(`http://scoreboard-tatami-1:3000` por defecto). En P2.3D solo está habilitado
+el Tatami 1: cualquier otro tatami se rechaza con 400 y **la URL nunca la envía
+el cliente**.
+
+La entrega usa `PUT {base}/internal/tatamis/1/assignment` con la cabecera
+`X-Internal-Token`. El secreto se toma de `SCOREBOARD_INTERNAL_TOKEN`: **no está
+hardcodeado, no viaja al navegador y no se registra en logs**. Si no está
+configurado, la entrega devuelve error en vez de simular éxito.
 
 ## Endpoints
 
@@ -24,7 +37,7 @@ POST /tatamis/{tatami_id}/assign-match
 POST /tatamis/{tatami_id}/result
 ```
 
-### Normalizar un combate
+### Normalizar y entregar un combate
 
 `POST /tatamis/1/assign-match` acepta **solo** estos tres campos:
 
@@ -37,12 +50,14 @@ strings ni números decimales. Solo está permitido `tatami_id=1` y debe
 coincidir con la ruta. Los campos adicionales (incluidos `red`, `blue`,
 `category`, `duration_seconds` o el antiguo `tatami`) se rechazan.
 
-Ejemplo de respuesta normalizada (identificadores/nombres ilustrativos):
+La respuesta confirma la entrega real (identificadores/nombres ilustrativos).
+Primera asignación: HTTP 201 con `status=assigned`. Replay idempotente: HTTP 200
+con `status=replayed`. `state` es el snapshot devuelto por el scoreboard.
 
 ```json
 {
-  "status": "normalized",
-  "scoreboard_sent": false,
+  "status": "assigned",
+  "scoreboard_sent": true,
   "match": {
     "tournament_id": 7,
     "match_id": 40,
@@ -51,6 +66,13 @@ Ejemplo de respuesta normalizada (identificadores/nombres ilustrativos):
     "fighter_b": {"stage_item_input_id": 2, "team_id": 102, "name": "Bea", "club": null},
     "category": {"stage_item_id": 20, "name": "Adult / Blue / 70kg"},
     "duration_seconds": 300
+  },
+  "state": {
+    "session_id": "…",
+    "revision": 1,
+    "remaining_seconds": 300,
+    "fighter_a": {"name": "Ana", "points": 0, "advantages": 0, "penalties": 0},
+    "fighter_b": {"name": "Bea", "points": 0, "advantages": 0, "penalties": 0}
   }
 }
 ```
@@ -74,10 +96,13 @@ Errores de asignación:
 - 400: ruta y tatami del body no coinciden.
 - 422: body inválido, extras o identificadores no admitidos.
 - 401/403/404 de Bracket: se conservan; combate ausente también devuelve 404.
-- 409: combate draft, mismo competidor o mismo input.
+- 409: combate draft, mismo competidor o mismo input; también se refleja el 409
+  del scoreboard.
 - 502: fallo de transporte, otro error HTTP, JSON/estructura inválida,
-  pertenencia inconsistente, input sin resolver o duración inválida.
-- 504: timeout de Bracket.
+  pertenencia inconsistente, input sin resolver o duración inválida. Incluye
+  conexión rechazada, 5xx y respuesta inválida del scoreboard, y el token interno
+  sin configurar. Nunca se disfraza de éxito.
+- 504: timeout de Bracket o del scoreboard.
 
 ### Resultados deshabilitados
 

@@ -3,6 +3,8 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const TOKEN='synthetic-internal-token';
+process.env.SCOREBOARD_INTERNAL_TOKEN=TOKEN;
 const fixture=()=>({tournament_id:7,match_id:40,tatami_id:1,fighter_a:{stage_item_input_id:1,team_id:101,name:'Ana',club:null},fighter_b:{stage_item_input_id:2,team_id:102,name:'Bea',club:null},category:{stage_item_id:9,name:'Adult'},duration_seconds:300});
 const store=()=>require('../state').createStore();
 test('01 empty state is explicit null',()=>{assert.equal(store().snapshot(),null);});
@@ -66,14 +68,16 @@ async function running(t) {
  const a=require('../integrated').createServer(legacyRoot);await new Promise(r=>a.server.listen(0,'127.0.0.1',r));
  t.after(()=>new Promise(r=>a.io.close(r)));return {...a,url:'http://127.0.0.1:'+a.server.address().port};
 }
-const putAssignment=(url,p)=>fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});
+const auth=(extra={})=>({'x-internal-token':TOKEN,...extra});
+const putAssignment=(url,p)=>fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:auth({'content-type':'application/json'}),body:JSON.stringify(p)});
+const putAssignmentNoToken=(url,p)=>fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});
 test('12 integrated HTTP assignment/state, errors, and legacy routes',async t=>{
- const {url}=await running(t);assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state')).json(),{state:null});
+ const {url}=await running(t);assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state',{headers:auth()})).json(),{state:null});
  for(const route of ['/','/control','/control2','/js/main.js','/socket.io/socket.io.js'])assert.equal((await fetch(url+route)).status,200,route);
  assert.equal((await putAssignment(url,{...fixture(),extra:1})).status,400);
  const malformed=await fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:{'content-type':'application/json'},body:'{'});assert.equal(malformed.status,400);
  const r=await putAssignment(url,fixture());assert.equal(r.status,201);const body=await r.json();
- assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state')).json(),body);
+ assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state',{headers:auth()})).json(),body);
  assert.equal((await putAssignment(url,fixture())).status,200);
  assert.equal((await putAssignment(url,{...fixture(),duration_seconds:400})).status,409);
  assert.equal((await putAssignment(url,{...fixture(),match_id:41})).status,409);
@@ -88,7 +92,7 @@ async function connect(url) {
 const events=packets=>packets.filter(p=>p.startsWith('42')).map(p=>JSON.parse(p.slice(2)));
 test('13 connection snapshot and both accepted and idempotent assignment emit tatami:state only',async t=>{
  const {url}=await running(t),a=await connect(url);const initial=await a.poll();assert.equal(events(initial).length,0);
- await putAssignment(url,fixture());const state=await (await fetch(url+'/internal/tatamis/1/state')).json();
+ await putAssignment(url,fixture());const state=await (await fetch(url+'/internal/tatamis/1/state',{headers:auth()})).json();
  assert.deepEqual(events(await a.poll()),[['tatami:state',state.state]]);
  assert.equal((await putAssignment(url,{...fixture(),duration_seconds:301})).status,409);
  assert.equal((await putAssignment(url,{...fixture(),extra:true})).status,400);
@@ -97,7 +101,7 @@ test('13 connection snapshot and both accepted and idempotent assignment emit ta
  await a.close();await b.close();
 });
 test('14 exact legacy four relays: three include sender, name excludes sender; no state mutation/update',async t=>{
- const {url}=await running(t);await putAssignment(url,fixture());const before=await (await fetch(url+'/internal/tatamis/1/state')).json();
+ const {url}=await running(t);await putAssignment(url,fixture());const before=await (await fetch(url+'/internal/tatamis/1/state',{headers:auth()})).json();
  const a=await connect(url),b=await connect(url);await a.poll();await b.poll();
  for(const event of ['bjj:score','bjj:start','bjj:restart']) {
   const payload={nested:{x:event},score:99};await a.send(event,payload);
@@ -105,7 +109,7 @@ test('14 exact legacy four relays: three include sender, name excludes sender; n
  }
  await a.send('bjj:name',{name:'Synthetic'});assert.deepEqual(events(await b.poll()),[['bjj:name',{name:'Synthetic'}]]);
  await assert.rejects(a.poll(),e=>e.name==='TimeoutError');
- assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state')).json(),before);
+ assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state',{headers:auth()})).json(),before);
  await b.close();
 });
 test('15 default standalone launcher starts unchanged legacy app; integrated is explicit',async t=>{
@@ -119,8 +123,34 @@ test('15 default standalone launcher starts unchanged legacy app; integrated is 
   for(let i=0;i<60;i++){try{if((await fetch(url+'/')).status===200){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,25));}
   assert.equal(ready,true,'launcher mode '+mode+' must listen');
   assert.equal((await fetch(url+'/control')).status,200);assert.equal((await fetch(url+'/control2')).status,200);
-  assert.equal((await fetch(url+'/internal/tatamis/1/state')).status,mode?200:404);
+  assert.equal((await fetch(url+'/internal/tatamis/1/state',{headers:auth()})).status,mode?200:404);
   if(!mode)assert.equal((await putAssignment(url,fixture())).status,404);
   child.kill();await stopped;
  }
+});
+
+test('16 internal endpoints reject a missing token with 401',async t=>{
+ const {url}=await running(t);
+ assert.equal((await fetch(url+'/internal/tatamis/1/state')).status,401);
+ assert.equal((await fetch(url+'/internal/tatamis/1/state',{headers:{'x-internal-token':''}})).status,401);
+ assert.equal((await putAssignmentNoToken(url,fixture())).status,401);
+});
+
+test('17 internal endpoints reject a wrong token with 401',async t=>{
+ const {url}=await running(t);
+ for(const bad of ['synthetic-internal-tokeX','short','',TOKEN+'x']) {
+  assert.equal((await fetch(url+'/internal/tatamis/1/state',{headers:{'x-internal-token':bad}})).status,401,bad);
+  assert.equal((await fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:{'x-internal-token':bad,'content-type':'application/json'},body:JSON.stringify(fixture())})).status,401,bad);
+ }
+ assert.deepEqual(await (await fetch(url+'/internal/tatamis/1/state',{headers:{'x-internal-token':TOKEN}})).json(),{state:null});
+});
+
+test('18 correct token is accepted while the browser receives tatami:state without any token',async t=>{
+ const {url}=await running(t);
+ assert.equal((await putAssignment(url,fixture())).status,201);
+ const state=await (await fetch(url+'/internal/tatamis/1/state',{headers:{'x-internal-token':TOKEN}})).json();
+ for(const route of ['/','/control','/control2','/js/main.js'])assert.equal((await fetch(url+route)).status,200,route);
+ const a=await connect(url);
+ assert.deepEqual(events(await a.poll()),[['tatami:state',state.state]]);
+ await a.close();
 });

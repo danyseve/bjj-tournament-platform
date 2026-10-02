@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     scoreboard_tatami_4_url: str = "http://scoreboard-tatami-4:3000"
     scoreboard_tatami_5_url: str = "http://scoreboard-tatami-5:3000"
     scoreboard_tatami_6_url: str = "http://scoreboard-tatami-6:3000"
+    scoreboard_internal_token: str = ""
+    scoreboard_timeout_seconds: float = 10.0
 
     class Config:
         env_file = ".env"

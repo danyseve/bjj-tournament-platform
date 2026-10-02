@@ -141,24 +141,32 @@ def test_missing_match():
         bc.locate_match(stages(), 7, 999)
 
 
-def test_assign_api_normalizes_without_scoreboard_transport(monkeypatch):
+def test_assign_api_normalizes_and_delivers_to_scoreboard(monkeypatch):
     from app import main
     seen = []
+    match, category = bc.locate_match(stages(), 7, 40)
+    normalized = bc.normalize_match(match, category, 7).model_dump()
+    snapshot = {"session_id": "synthetic-session", "revision": 1}
     def handler(request):
         seen.append(request)
-        return httpx.Response(200, json=stages())
+        if request.method == "GET":
+            return httpx.Response(200, json=stages())
+        return httpx.Response(201, json={"state": snapshot})
     real_client = httpx.AsyncClient
     monkeypatch.setattr(bc.httpx, "AsyncClient", lambda **kw: real_client(
         transport=httpx.MockTransport(handler), **kw))
+    monkeypatch.setattr(main.scoreboard_client, "token", "synthetic-internal-token")
     response = ApiClient(main.app).post("/tatamis/1/assign-match",
         json={"tatami_id": 1, "tournament_id": 7, "match_id": 40})
-    assert response.status_code == 200
+    assert response.status_code == 201
     body = response.json()
-    assert body["status"] == "normalized"
-    assert body["scoreboard_sent"] is False
-    match, category = bc.locate_match(stages(), 7, 40)
-    assert body["match"] == bc.normalize_match(match, category, 7).model_dump()
-    assert len(seen) == 1 and seen[0].method == "GET"
+    assert body["status"] == "assigned"
+    assert body["scoreboard_sent"] is True
+    assert body["match"] == normalized
+    assert body["state"] == snapshot
+    assert [r.method for r in seen] == ["GET", "PUT"]
+    assert seen[1].url.path == "/internal/tatamis/1/assignment"
+    assert seen[1].headers["x-internal-token"] == "synthetic-internal-token"
 
 
 @pytest.mark.parametrize("change", [{"tatami_id": 2}, {"tatami_id": True},

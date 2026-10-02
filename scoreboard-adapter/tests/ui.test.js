@@ -4,6 +4,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {JSDOM}=require('jsdom');
+const TOKEN='synthetic-internal-token';
+process.env.SCOREBOARD_INTERNAL_TOKEN=TOKEN;
 const legacyRoot=path.resolve(__dirname,'../../services/scoreboard');
 async function running(t) {
  const a=require('../integrated').createServer(legacyRoot);
@@ -127,7 +129,7 @@ test('UI08 only tatami:state is registered; no legacy listeners or outbound even
 });
 const assignment=()=>({tournament_id:77,match_id:400,tatami_id:1,fighter_a:{stage_item_input_id:1,team_id:101,name:'Synthetic Ana',club:null},fighter_b:{stage_item_input_id:2,team_id:102,name:'Synthetic Bea',club:null},category:{stage_item_id:9,name:'Synthetic Adult'},duration_seconds:305});
 async function assign(url) {
- const res=await fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(assignment())});assert.equal(res.status,201);return (await res.json()).state;
+ const res=await fetch(url+'/internal/tatamis/1/assignment',{method:'PUT',headers:{'content-type':'application/json','x-internal-token':TOKEN},body:JSON.stringify(assignment())});assert.equal(res.status,201);return (await res.json()).state;
 }
 async function connectionSnapshot(url) {
  const opening=await (await fetch(url+'/socket.io/?EIO=4&transport=polling')).text();

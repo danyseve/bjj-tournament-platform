@@ -11,10 +11,13 @@ Integrated es opt-in explícito: construye Express y Socket.IO reutilizando
 `/app/routes`, `/app/views` y `/app/public`, sin cargar el servidor original.
 No cambia UI, Compose, env, nginx, PostgreSQL ni producción.
 
-Esta API **no tiene autenticación**: solo para una red interna de confianza.
-No publicar `/internal/` ni el puerto integrated en Internet. No se añaden
-credenciales ni secretos. La prueba aislada publica exclusivamente
-`127.0.0.1:39000`, sin red `bjj-net` ni volúmenes.
+Esta API exige un secreto compartido en los endpoints `/internal/*`: la cabecera
+`X-Internal-Token` debe coincidir con `SCOREBOARD_INTERNAL_TOKEN`. El valor viene
+del entorno, **no está hardcodeado** y no se registra en logs (comparación en
+tiempo constante). Sin secreto configurado, `/internal/*` responde **401**
+(fail-closed). El navegador/UI nunca envía ni conoce ese token: la presentación
+llega por el socket `tatami:state`. No publicar `/internal/` ni el puerto
+integrated en Internet, y no añadir credenciales fuera de ese secreto.
 
 ## Contrato integrado
 

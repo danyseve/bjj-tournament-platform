@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('node:path');
 const http = require('node:http');
 const cookieParser = require('cookie-parser');
+const crypto = require('node:crypto');
 const logger = require('morgan');
 const createError = require('http-errors');
 const {Server} = require('socket.io');
@@ -12,6 +13,18 @@ const {createStore} = require('./state');
 function createServer(legacyRoot = '/app') {
  const app = express();
  const store = createStore();
+ // Internal API is fail-closed: without a configured token every /internal request is refused.
+ // The browser/UI never receives this token; only the Bridge uses it.
+ const internalToken = process.env.SCOREBOARD_INTERNAL_TOKEN || '';
+ const requireInternalToken = (req, res, next) => {
+  const provided = req.get('x-internal-token');
+  if (typeof internalToken !== 'string' || internalToken.length === 0 || typeof provided !== 'string'
+   || provided.length !== internalToken.length
+   || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(internalToken))) {
+   return res.status(401).json({error: 'Internal token required'});
+  }
+  next();
+ };
  app.set('views', path.join(legacyRoot, 'views'));
  app.set('view engine', 'pug');
  app.use(logger('dev'));
@@ -30,8 +43,8 @@ function createServer(legacyRoot = '/app') {
   const snapshot = store.snapshot();
   if (snapshot !== null) socket.emit('tatami:state', snapshot);
  });
- app.get('/internal/tatamis/1/state', (req, res) => res.json({state: store.snapshot()}));
- app.put('/internal/tatamis/1/assignment', (req, res) => {
+ app.get('/internal/tatamis/1/state', requireInternalToken, (req, res) => res.json({state: store.snapshot()}));
+ app.put('/internal/tatamis/1/assignment', requireInternalToken, (req, res) => {
   const result = store.assign(req.body);
   if (result.status === 400) return res.status(400).json({error: 'Invalid normalized assignment'});
   if (result.status === 409) return res.status(409).json({error: 'Tatami already has an active assignment'});
