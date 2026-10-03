@@ -417,8 +417,8 @@ No existe hoy ninguna señal persistente de modalidad: `tournaments` no tiene ca
 el formulario de alta/edición de torneo no lo pregunta, `players_can_be_in_multiple_teams` es una regla
 de plantillas y el `type` del stage item describe el formato de competición
 (`SINGLE_ELIMINATION`/`ROUND_ROBIN`/`SWISS`), no individual vs equipos. "Todos los equipos con un
-jugador" depende de datos editables durante el torneo y no se acepta como criterio. Requiere campo de
-modalidad (fases 3/4).
+jugador" depende de datos editables durante el torneo y no se acepta como criterio. Se resolverá junto al modelo de dominio (F3/F4); en esta fase no
+se introduce ningún campo de modalidad (`tournament_type`, `competition_mode`) ni heurística alguna.
 
 ### 13.4 Tests y validación
 
@@ -428,11 +428,21 @@ receta: `pnpm test:unit` (17/17), `tsc` (0 errores), prettier (gate del CI: 0 di
 `vite build` (ok) y `pnpm install --frozen-lockfile` (ok). ESLint no es ejecutable en el fork
 (`.eslintrc.js` legacy frente a ESLint 9, sin script `lint`) y no forma parte del CI.
 
-### 13.5 CI del fork
+### 13.5 CI del fork (completo en verde)
 
-En el nuevo HEAD quedan en verde `backend` y `docker build`. `frontend` y `docs build` fallan en el
-paso de instalación con `ERR_PNPM_IGNORED_BUILDS` (esbuild): es **preexistente** (ya fallaban en el
-HEAD anterior). No se ha modificado la configuración de CI en esta fase.
+Los dos workflows rojos (frontend y docs) fallaban por la versión de pnpm que elegía Corepack: ambos
+hacían `corepack enable` sin fijar versión y el proyecto no declara `packageManager`, así que Corepack
+resolvía su versión por defecto — **pnpm 12.8.1** en node 22.23.3, según el propio log del CI
+("Corepack is about to download … pnpm-12.8.1.tgz") y la reproducción local. Desde pnpm 10 los scripts
+de build de las dependencias están bloqueados y `pnpm install` aborta con `ERR_PNPM_IGNORED_BUILDS`
+(frontend: `esbuild@0.27.7`; docs: `sharp@0.34.5`, `unrs-resolver@1.11.1`).
+
+Arreglo (solo workflow; sin tocar dependencias ni lockfiles): fijar en ambos workflows el pnpm de la
+receta de build antes de instalar (`corepack prepare pnpm@9.15.9 --activate`). No se desactivan scripts
+de build, no se ignora el error, no se usa `--ignore-scripts` y no se relaja ninguna comprobación.
+Lockfiles intactos al instalar en local (`frontend` `001f9b8e…`, `docs` `8594f1ad…`), igual que los
+asserts de la receta. Resultado: `backend`, `docker build`, `docs test` y `frontend` **GREEN** en el
+mismo SHA (`8a9a482`), con `Done in 10.7s using pnpm v9.15.9` en los logs.
 
 ### 13.6 Comprobación de no-regresión de datos
 
@@ -445,3 +455,16 @@ y sin hora en el ensayo; `active_match_id` nulo; `WRITE` deshabilitado.
 Nota de método: los "md5 invariantes" anotados en fases anteriores no son reproducibles hoy (se
 generaron con expresiones ad-hoc distintas y sobre estados anteriores al backfill). La verificación
 fiable es la comparación fila a fila contra el snapshot, que es la que se ha usado.
+
+### 13.7 Publicación de la imagen (`29b6146-r1`)
+
+Publicada sin reconstruir y sin tocar `latest`:
+
+- image ID local = `sha256:24b9f0da355ec122bebe1fbb4d2e82c37b3f70b58708c8fceac019bced8763f1`
+- manifest digest remoto = `sha256:0b7672fe8b321852682af5168b403d2a7d87e017cb43a8c7c30388ee7606f950` (3663 B)
+- config digest remoto == image ID local; blob de config (14146 B) re-hasheado == image ID
+- `rootfs.diff_ids`: 16 locales == 16 remotos (idénticos)
+- labels: `revision=29b6146c4a3a1fd577e1fff48eec2c4a5dde5168`, `recipe_revision=r1`,
+  `pnpm_version=9.15.9`, `pnpm_lock_sha256=001f9b8e…`
+- `latest` con el mismo digest antes y después del push; el contenedor productivo no se ha recreado
+  (sigue ejecutando la misma imagen).
