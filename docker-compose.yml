@@ -33,8 +33,8 @@ services:
 
   bracket:
     # P2.8B-F2 — seed bye-aware + scheduler estructural. Imagen del fork @8ec816b.
-    # Rollback: danyseve1/bracket-bjj:29b6146-r1
-    image: danyseve1/bracket-bjj:8ec816b-r1
+    # Rollback: danyseve1/bracket-bjj:cbab68a-r1
+    image: danyseve1/bracket-bjj:886ff13-r1
     container_name: bracket
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
