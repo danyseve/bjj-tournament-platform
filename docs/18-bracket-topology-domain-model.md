@@ -1,6 +1,6 @@
 # 18 - Topología de cuadro, modelo de dominio y UX para BJJ (P2.8B - diseño)
 
-Estado: **P2.8B - DESIGN READY ✅** (2026-10-03). **Documento de diseño: nada implementado.**
+Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13). Las fases 2–4 (§3–§10) siguen siendo **propuesta**: sin implementar.
 
 Alcance de esta fase (deliberadamente solo análisis y diseño): separar (A) topología/seeding del cuadro,
 (B) modelo de dominio y (C) UX para BJJ, sin introducir todavía ninguna remodelación de modelo ni
@@ -385,3 +385,63 @@ branding; habilitar `WRITE`; publicar resultados; tocar Access/DNS/Tunnel.
   slots del ensayo; esquema de las tablas en `information_schema`; estado del scheduler (`con_court=0`).
 - Observación de mantenimiento (no funcional): `bracket/logic/scheduling/builder.py:26` importa
   `tests.integration_tests.mocks.MOCK_NOW` desde código de producción; conviene eliminarlo en fase 1/2.
+
+## 13. F1 — UX / copy seguro (implementado)
+
+Estado: **implementado, desplegado y validado** (2026-10-03). Sin migración ni cambios de modelo,
+esquema, API, seeding, scheduler o lógica de torneo. Fork `danyseve/bracket` @ `29b6146`; imagen
+`danyseve1/bracket-bjj:29b6146-r1`; se recreó únicamente el servicio `bracket`.
+
+### 13.1 Cancha → Tatami (solo copy en español)
+
+Reescritos los **13 valores** de `frontend/public/locales/es/common.json` que mencionaban "cancha":
+`active_next_round_modal_title`, `add_court_title`, `all_matches_scheduled_description`,
+`auto_assign_courts_label`, `court_name_input_placeholder`, `courts_filled_badge`, `courts_title`,
+`create_court_button`, `delete_court_button`, `go_to_courts_page`, `no_courts_description`,
+`no_courts_description_swiss`, `no_courts_title`. No se han tocado claves técnicas (`courts`,
+`court_id`), endpoints, modelos, SQL ni contrato de API; el resto de idiomas conserva su redacción.
+
+### 13.2 Nombres de ronda (solo presentación)
+
+Módulo puro nuevo `frontend/src/components/utils/round.ts` (`getRoundLabelKey` y
+`getRoundDisplayName`), consumido en `brackets/round.tsx` y `modals/round_modal.tsx`. `Round.name` en
+base de datos y `sql/rounds.py` quedan intactos (el organizador sigue pudiendo renombrar la ronda).
+Mapeo por número de rondas del cuadro: 1 Final · 2 Semifinal/Final · 3 Cuartos/Semifinal/Final ·
+4 Octavos/… · 5 Dieciseisavos/…. Claves `round_label_*` añadidas a `es` y `en` (el resto de idiomas
+cae al inglés por `fallbackLng: "en"`). Fallback al nombre almacenado cuando el stage item no es
+`SINGLE_ELIMINATION`, no se localiza la ronda, el cuadro excede 5 rondas o la clave no está traducida.
+
+### 13.3 Labels contextuales individual/equipos — APLAZADO (sin señal fiable)
+
+No existe hoy ninguna señal persistente de modalidad: `tournaments` no tiene campo de tipo/modalidad,
+el formulario de alta/edición de torneo no lo pregunta, `players_can_be_in_multiple_teams` es una regla
+de plantillas y el `type` del stage item describe el formato de competición
+(`SINGLE_ELIMINATION`/`ROUND_ROBIN`/`SWISS`), no individual vs equipos. "Todos los equipos con un
+jugador" depende de datos editables durante el torneo y no se acepta como criterio. Requiere campo de
+modalidad (fases 3/4).
+
+### 13.4 Tests y validación
+
+`frontend/tests/` con el runner `node:test` (sin dependencias nuevas): etiquetas de ronda y sus
+fallbacks, y presencia/valor de las claves de copy en `es`/`en`. Ejecutado en el mismo node/pnpm de la
+receta: `pnpm test:unit` (17/17), `tsc` (0 errores), prettier (gate del CI: 0 diferencias),
+`vite build` (ok) y `pnpm install --frozen-lockfile` (ok). ESLint no es ejecutable en el fork
+(`.eslintrc.js` legacy frente a ESLint 9, sin script `lint`) y no forma parte del CI.
+
+### 13.5 CI del fork
+
+En el nuevo HEAD quedan en verde `backend` y `docker build`. `frontend` y `docs build` fallan en el
+paso de instalación con `ERR_PNPM_IGNORED_BUILDS` (esbuild): es **preexistente** (ya fallaban en el
+HEAD anterior). No se ha modificado la configuración de CI en esta fase.
+
+### 13.6 Comprobación de no-regresión de datos
+
+Tras el despliegue, `matches`, `rounds`, `stage_items`, `stage_item_inputs`, `courts`, `players`,
+`teams` y `clubs` se compararon fila a fila contra el snapshot `backups/bracket_20261003_054342.sql`
+(previo al backfill de P2.8A): todas idénticas salvo las **4 filas del backfill autorizado de P2.8A**
+(`M80`, `M94`, `M102`, `M103`), que ya estaban en el estado esperado. Sin marcador, sin tatami asignado
+y sin hora en el ensayo; `active_match_id` nulo; `WRITE` deshabilitado.
+
+Nota de método: los "md5 invariantes" anotados en fases anteriores no son reproducibles hoy (se
+generaron con expresiones ad-hoc distintas y sobre estados anteriores al backfill). La verificación
+fiable es la comparación fila a fila contra el snapshot, que es la que se ha usado.
