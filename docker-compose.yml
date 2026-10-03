@@ -32,9 +32,9 @@ services:
     restart: unless-stopped
 
   bracket:
-    # P2.8B-F1 — UX BJJ (cancha->tatami, nombres de ronda). Imagen del fork @29b6146.
-    # Rollback: danyseve1/bracket-bjj:9bc58b3-r1
-    image: danyseve1/bracket-bjj:29b6146-r1
+    # P2.8B-F2 — seed bye-aware + scheduler estructural. Imagen del fork @8ec816b.
+    # Rollback: danyseve1/bracket-bjj:29b6146-r1
+    image: danyseve1/bracket-bjj:8ec816b-r1
     container_name: bracket
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
