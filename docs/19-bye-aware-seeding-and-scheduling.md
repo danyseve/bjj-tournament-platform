@@ -4,7 +4,10 @@ Estado: **P2.8B F2 — ENGINE + REHEARSAL VALIDATED ✅** (2026-10-03). Cambio d
 fork `danyseve/bracket` (`master`, HEAD `8ec816b`) y **desplegado**: pin del submódulo `8ec816b`, imagen
 productiva `danyseve1/bracket-bjj:8ec816b-r1` (rollback documentado → `29b6146-r1`), `tournament_id=6`
 intacto como *P2.8A historical rehearsal* (0 scores, 0 planning) y `WRITE=false`. El ensayo nuevo es
-`tournament_id=9` (§5ter, §8). Deuda funcional explícita: **UI AUTO-SEED GAP ⚠️** (§6bis).
+`tournament_id=9` (§5ter, §8). La deuda funcional **UI AUTO-SEED GAP ⚠️** (§6bis) quedó **RESOLVED ✅**
+en **F2C** (§10 y `docs/20-generate-bracket-ui.md`): fork `8ec816b` → **`886ff13`**, imagen
+`danyseve1/bracket-bjj:886ff13-r1` (rollback `cbab68a-r1`), acción UI explícita «Generar cuadro» y ensayo
+real `tournament_id=10` validado por SQL read-only y visualmente por el operador.
 
 Continúa a `docs/17-bye-auto-advance.md` (P2.8A: avance **aguas abajo**) y a
 `docs/18-bracket-topology-domain-model.md` §2–§4 (diseño **aguas arriba**: reparto de slots y
@@ -268,26 +271,26 @@ partidos sin planning. Criterio de aceptación y decisión del operador: §8.1.
   además el *P2.8A historical rehearsal*: topología antigua, 3 byes directos + 2 ghosts, 0 scores, 0
   planning. El único torneo con planning es el ensayo nuevo `9` (§5ter).
 
-### 6bis. Deuda funcional — UI AUTO-SEED GAP ⚠️
+### 6bis. Deuda funcional — UI AUTO-SEED GAP ✅ RESOLVED (F2C)
 
-El reparto bye-aware corre **solo cuando los inscritos existen al construir el cuadro**:
+El reparto bye-aware corría **solo cuando los inscritos existían al construir el cuadro**:
 
 - **Importador / create-with-inputs**: ✅ el cuadro se construye con los inscritos ya repartidos
   (`distribute_entrants_into_slots`), así que el seeding bye-aware se aplica automáticamente.
-- **UI estándar**: ⚠️ crea el `stage_item` con inputs **vacíos** (`routes/stage_items.py:96`,
-  `utils/db_init.py`) y añade los equipos **después** (`routes/stage_item_inputs.py`), de modo que
-  `determine_matches_first_round` empareja slots vacíos: la UI **no dispara** el seeding bye-aware y
-  vuelve a producir byes concentrados y ghosts `∅/∅`. El resolver estructural de P2.8A sigue salvando
-  el avance (ningún equipo queda bloqueado), pero el reparto no es el nuevo.
+- **UI estándar**: ⚠️ creaba el `stage_item` con inputs **vacíos** (`routes/stage_items.py:96`,
+  `utils/db_init.py`) y añadía los equipos **después** (`routes/stage_item_inputs.py`), de modo que
+  `determine_matches_first_round` emparejaba slots vacíos: la UI **no disparaba** el seeding bye-aware y
+  volvía a producir byes concentrados y ghosts `∅/∅`. El resolver estructural de P2.8A seguía salvando el
+  avance (ningún equipo queda bloqueado), pero el reparto no era el nuevo.
 
-**Estado: no implementado.** Opciones para la microfase siguiente:
+**Estado: RESOLVED ✅** en la fase **F2C** (§10). Opciones evaluadas y decisión:
 
-- **A) Endpoint explícito** `Seed bracket` (API) que reordene los slots del `stage_item`.
-- **B) Auto-seed al completar las inscripciones** (efecto lateral automático al quedar completo el cuadro).
-- **C) Acción UI `Generate bracket`** — explícita, reproducible y visible para el operador.
-
-Recomendación del operador: **C** (acción explícita y reproducible, sin efectos laterales ocultos). No
-se implementa sin nueva autorización.
+- **A) Endpoint implícito** `Seed bracket` — **descartada** (efecto no visible para el operador).
+- **B) Auto-seed al completar las inscripciones** — **descartada** (*no* se quieren efectos laterales
+  ocultos ni re-seeding silencioso).
+- **C) Acción UI `Generate bracket`** — **IMPLEMENTADA** (elegida): explícita, reproducible, con gates de
+  seguridad e idempotente. Detalle completo, evidencia `archivo:línea` y ensayo real en
+  `docs/20-generate-bracket-ui.md`.
 
 ---
 
@@ -304,7 +307,9 @@ se implementa sin nueva autorización.
 | `backend/tests/unit_tests/structural_scheduling_test.py` | **nuevo** — 9 tests |
 | `scripts/rehearsal/f2_fixture.py` (repo principal) | **nuevo** — fixture end-to-end en `bracket_test` (§12) |
 
-Imagen validada: `danyseve1/bracket-bjj:8ec816b-r1` (id `97f7f0d89ce7`, label
+Ficheros de F2C (endpoint, UI, i18n, fixture y tests): `docs/20-generate-bracket-ui.md` §13.
+
+Imagen validada (F2): `danyseve1/bracket-bjj:8ec816b-r1` (id `97f7f0d89ce7`, label
 `BRACKET_UPSTREAM_COMMIT=8ec816b16814198dbc5e58007d895471ad3c178e`, `RECIPE_REVISION=r1`, locks
 `uv.lock` `24f99c8e…` y `pnpm-lock.yaml` `001f9b8e…` verificados por el propio build). **No** se ha
 re-etiquetado `latest` ni tocado `29b6146-r1`.
@@ -334,6 +339,37 @@ planning · 0 ghosts**.
 ## 9. No hacer (sigue fuera de alcance)
 
 Modelo de dominio Club/Competitor/Team/Entrant, labels contextuales, branding, Tatami 2–6, `WRITE`,
-Access/DNS/Tunnel, doble eliminación. F2 cierra con el pin del submódulo en `8ec816b`, la imagen
-`8ec816b-r1` en producción (rollback → `29b6146-r1`) y `tournament_id=6` intacto; **no** se implementa
-el `UI AUTO-SEED GAP` (§6bis), **no** se re-seedea ningún cuadro existente y **no** se inicia F3.
+Access/DNS/Tunnel, doble eliminación. F2 cerró con el pin del submódulo en `8ec816b` y la imagen
+`8ec816b-r1` (rollback → `29b6146-r1`) con `tournament_id=6` intacto; F2C lo extiende con el pin
+`886ff13` y la imagen `886ff13-r1` (rollback → `cbab68a-r1`), resolviendo el `UI AUTO-SEED GAP` (§6bis,
+§10). **No** se re-seedea ningún cuadro existente, **no** hay auto-reseed ni heurísticas ocultas y **no**
+se inicia F3.
+
+---
+
+## 10. F2C — acción UI «Generar cuadro» (UI AUTO-SEED GAP RESOLVED ✅)
+
+Microfase **F2C** (2026-10-03): fork `danyseve/bracket` @ **`886ff13`** (desde `8ec816b`), imagen
+`danyseve1/bracket-bjj:886ff13-r1` (rollback `cbab68a-r1`; pre-F2C `8ec816b-r1`), recreado **solo** el
+servicio `bracket`.
+
+- **Endpoint explícito** `POST /tournaments/{t}/stage_items/{si}/generate_bracket`
+  (`backend/bracket/routes/stage_items.py:248`), lógica pura en
+  `backend/bracket/logic/scheduling/generation.py` (`plan_bracket_generation:143`,
+  `generate_bracket_for_stage_item:181`); reutiliza `distribute_entrants_into_slots` + resolver P2.8A,
+  escribe en **una transacción con rollback total** y respeta el invariante `N → B` sin sobredimensionar.
+- **Gates** (409 `generate_bracket_blocked: <code>`): `scores`, `winner`, `planning`,
+  `tentative_inputs`, `not_single_elimination`, `too_few_entrants`, `bracket_too_large`,
+  `inconsistent_slots`; torneo archivado → 400.
+- **Idempotencia**: segunda ejecución → `changed=false` sin mutación (verificado sobre la base real).
+- **UI**: botón/modal «Generar cuadro» (copy ES/EN, sin el término *ghost*). Acción **explícita**: nada
+  se dispara al añadir/quitar equipos, editar un entrant ni abrir la página. **No** hay auto-reseed.
+- **Ensayo real**: `tournament_id=10` «Torneo De pruebas REHEARSAL F2C» (`stage_item_id=49`, 8 plazas, 6
+  equipos → slots 1,2,3,5,6,7; vacíos 4 y 8): 2 cruces + **2 pases directos** + 0 combates vacíos, resolver
+  P2.8A materializado, 0 scores, 0 planning, 0 court/start, 0 drafts, `changed=false` en la segunda
+  ejecución y `state=null` en Tatami 1. Validado por SQL read-only **y** visualmente por el operador
+  (modal traducido, 0 claves crudas).
+- CI del fork `886ff13`: **4/4 GREEN**.
+
+Detalle completo (contrato, gates, tests, fixture `scripts/rehearsal/f2c_fixture.py`, incidencia i18n y
+cierre): `docs/20-generate-bracket-ui.md`.

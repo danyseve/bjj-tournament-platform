@@ -1,6 +1,10 @@
 # 18 - Topología de cuadro, modelo de dominio y UX para BJJ (P2.8B - diseño)
 
-Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13) · **F2 (topología/seeding/scheduler) = ENGINE + REHEARSAL VALIDATED ✅** en el fork `danyseve/bracket` @ `8ec816b`, **desplegada** (pin `8ec816b`, imagen `8ec816b-r1`, rollback `29b6146-r1`): detalle y evidencia real del ensayo en `docs/19-bye-aware-seeding-and-scheduling.md` §5ter y §14. Deuda funcional explícita: **UI AUTO-SEED GAP ⚠️**. Las fases 3–4 (§10) siguen siendo **propuesta**: sin implementar.
+Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13) · **F2 (topología/seeding/scheduler) = ENGINE + REHEARSAL VALIDATED ✅** en el fork `danyseve/bracket` @ `8ec816b`, **desplegada** (pin `8ec816b`, imagen `8ec816b-r1`, rollback `29b6146-r1`): detalle y evidencia real del ensayo en `docs/19-bye-aware-seeding-and-scheduling.md` §5ter y §14. Deuda funcional **UI AUTO-SEED GAP**: **RESOLVED ✅** en la fase **F2C** (§15 y
+`docs/20-generate-bracket-ui.md`): fork `8ec816b` → `886ff13`, imagen `danyseve1/bracket-bjj:886ff13-r1`
+(rollback `cbab68a-r1`), acción UI explícita «Generar cuadro», endpoint con *safety gates* e idempotencia,
+y ensayo real `tournament_id=10` validado por SQL read-only y visualmente. Las fases 3–4 (§10) siguen
+siendo **propuesta**: sin implementar.
 
 Alcance de esta fase (deliberadamente solo análisis y diseño): separar (A) topología/seeding del cuadro,
 (B) modelo de dominio y (C) UX para BJJ, sin introducir todavía ninguna remodelación de modelo ni
@@ -387,11 +391,13 @@ schedulable planificados y 7 `STRUCTURAL_BYE` sin planning). `tournament_id=6` q
 `STRUCTURAL_BYE` / `DEAD`, `SCHEDULABLE = READY + PENDING_COMPETITIVE`) y evidencia en
 `docs/19-bye-aware-seeding-and-scheduling.md` §3.1, §5ter y §8.
 
-Deuda funcional **explícita y no resuelta**: **UI AUTO-SEED GAP ⚠️** — el seeding bye-aware solo corre
-cuando los inscritos existen al construir el cuadro (importador / create-with-inputs); la UI estándar
-crea el `stage_item` con inputs vacíos y asigna equipos después, así que no dispara
-`distribute_entrants_into_slots`. Opciones y recomendación (C: acción UI explícita `Generate bracket`)
-en `docs/19` §6bis. No se implementa sin autorización.
+Deuda funcional **UI AUTO-SEED GAP ⚠️** — el seeding bye-aware solo corría cuando los inscritos existían
+al construir el cuadro (importador / create-with-inputs); la UI estándar crea el `stage_item` con inputs
+vacíos y asigna equipos después, así que no disparaba `distribute_entrants_into_slots`. Opciones y
+recomendación (C: acción UI explícita `Generate bracket`) en `docs/19` §6bis →
+**RESOLVED ✅ en F2C** (§15): endpoint explícito con *safety gates* e idempotencia, acción «Generar cuadro»
+en la UI estándar, ensayo real `tournament_id=10` y cierre documental en
+`docs/20-generate-bracket-ui.md`.
 
 ## 12. Evidencia y artefactos
 
@@ -507,4 +513,29 @@ evidencia en `docs/19-bye-aware-seeding-and-scheduling.md`.
   0 planning); torneos 1 y 2 intactos; `WRITE=false`; Tatami 1 `state=null`.
 - Semántica del scheduler aceptada por el operador: `READY` → planificado · `PENDING_COMPETITIVE` →
   planificado · `STRUCTURAL_BYE` → **no** planificado · `DEAD`/ghost → **no** planificado.
-- Deuda restante: **UI AUTO-SEED GAP ⚠️** (§11bis). F3 no iniciada.
+- Deuda **UI AUTO-SEED GAP**: **RESOLVED ✅** en F2C (§11bis y §15, `docs/20-generate-bracket-ui.md`).
+  F3 no iniciada.
+
+## 15. F2C — acción UI «Generar cuadro» (UI AUTO-SEED GAP RESOLVED ✅)
+
+Fase **F2C** (2026-10-03): fork `danyseve/bracket` @ **`886ff13`** (desde `8ec816b`), imagen
+`danyseve1/bracket-bjj:886ff13-r1` (rollback `cbab68a-r1`), pin del submódulo del repo principal
+`8ec816b` → `886ff13`, recreado **solo** el servicio `bracket`. Implementa la opción **C** de §11bis: una
+acción **explícita** «Generar cuadro» (`POST .../stage_items/{si}/generate_bracket`) con *safety gates*,
+idempotente y **sin** auto-reseed, que aplica el seeding bye-aware de F2 al cuadro ya creado desde la UI
+estándar (el caso que F2 no cubría).
+
+- Reutiliza el motor de F2 (`distribute_entrants_into_slots`) y el resolver P2.8A; invariante `N → B`
+  sin sobredimensionar; escritura en una transacción con rollback total.
+- Gates 409 `generate_bracket_blocked:<code>` (`scores`, `winner`, `planning`, `tentative_inputs`,
+  `not_single_elimination`, `too_few_entrants`, `bracket_too_large`, `inconsistent_slots`); archivado →
+  400. Nada se borra ni se resetea; ninguna heurística oculta dispara la generación.
+- Ensayo real `tournament_id=10` «Torneo De pruebas REHEARSAL F2C» (`stage_item_id=49`, 8 plazas, 6
+  equipos en slots 1,2,3,5,6,7; vacíos 4 y 8): **2 cruces + 2 pases directos + 0 combates vacíos**, 0
+  ghosts, resolver P2.8A materializado, 0 scores / 0 planning / 0 court / 0 drafts y `changed=false` en
+  la segunda ejecución. Torneos 1, 2, 6 y 9 **intactos**; `WRITE=false`; Tatami 1 `state=null`.
+- Incidencia i18n detectada y cerrada durante la validación visual (§14): tipo de cambio en
+  `frontend/i18n_options.ts` (locales versionados, commit `886ff13`) y causa raíz documentada como
+  frescura/caché del SPA en el navegador.
+- CI del fork `886ff13`: **4/4 GREEN**. Documento de fase: `docs/20-generate-bracket-ui.md`; resumen en
+  `docs/19` §6bis y §10. F3 sigue **no iniciada**.
