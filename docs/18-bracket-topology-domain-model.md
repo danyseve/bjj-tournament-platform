@@ -1,6 +1,6 @@
 # 18 - Topología de cuadro, modelo de dominio y UX para BJJ (P2.8B - diseño)
 
-Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13). Las fases 2–4 (§3–§10) siguen siendo **propuesta**: sin implementar.
+Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13) · **F2 (topología/seeding/scheduler) IMPLEMENTADA Y VALIDADA** en el fork `danyseve/bracket` @ `8ec816b`, **sin desplegar** (pin `29b6146` e imagen `29b6146-r1` intactos): ver `docs/19-bye-aware-seeding-and-scheduling.md`. Las fases 3–4 (§10) siguen siendo **propuesta**: sin implementar.
 
 Alcance de esta fase (deliberadamente solo análisis y diseño): separar (A) topología/seeding del cuadro,
 (B) modelo de dominio y (C) UX para BJJ, sin introducir todavía ninguna remodelación de modelo ni
@@ -372,8 +372,14 @@ Criterio de entrada de cada fase: la anterior cerrada y validada, con `WRITE=fal
 ## 11. No hacer todavía (§16)
 
 Nada de lo listado se ha hecho ni se hará sin autorización explícita: migraciones de base de datos;
-tabla `Entrant`; `players.club_id`; modificar el seeding; modificar el scheduler; crear Tatami 2–6;
+tabla `Entrant`; `players.club_id`; crear Tatami 2–6;
 branding; habilitar `WRITE`; publicar resultados; tocar Access/DNS/Tunnel.
+
+## 11bis. Ya hecho en F2 (§16)
+
+El seeding bye-aware y el scheduler estructural **dejaron de ser propuesta** en F2 (fork `8ec816b`,
+CI verde, imagen `8ec816b-r1` validada en aislado con `bracket_test`; **sin desplegar** ni migrar
+`tournament_id=6**). Detalle completo en `docs/19-bye-aware-seeding-and-scheduling.md`.
 
 ## 12. Evidencia y artefactos
 
