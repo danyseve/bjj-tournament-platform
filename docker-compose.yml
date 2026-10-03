@@ -36,7 +36,7 @@ services:
     # El contenedor solo se recrea al ejecutar `docker compose up -d` (P2.5D);
     # P2.5C no ejecuta Compose. Rollback: volver al digest productivo anterior
     #   sha256:e07ec8b49ad8274229422c40a87331b285785a0b80120bb3111d05bb911e8df8
-    image: danyseve1/bracket-bjj:041fc6c-r1
+    image: danyseve1/bracket-bjj:9bc58b3-r1
     container_name: bracket
 #  bracket:
 #    image: danyseve/bracket-bjj:0.1.0
