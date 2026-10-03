@@ -1,6 +1,6 @@
 # 18 - Topología de cuadro, modelo de dominio y UX para BJJ (P2.8B - diseño)
 
-Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13) · **F2 (topología/seeding/scheduler) IMPLEMENTADA Y VALIDADA** en el fork `danyseve/bracket` @ `8ec816b`, **sin desplegar** (pin `29b6146` e imagen `29b6146-r1` intactos): ver `docs/19-bye-aware-seeding-and-scheduling.md`. Las fases 3–4 (§10) siguen siendo **propuesta**: sin implementar.
+Estado: **P2.8B - DESIGN READY ✅** · **F1 (UX/copy) IMPLEMENTADA, DESPLEGADA Y VALIDADA** (2026-10-03, ver §13) · **F2 (topología/seeding/scheduler) = ENGINE + REHEARSAL VALIDATED ✅** en el fork `danyseve/bracket` @ `8ec816b`, **desplegada** (pin `8ec816b`, imagen `8ec816b-r1`, rollback `29b6146-r1`): detalle y evidencia real del ensayo en `docs/19-bye-aware-seeding-and-scheduling.md` §5ter y §14. Deuda funcional explícita: **UI AUTO-SEED GAP ⚠️**. Las fases 3–4 (§10) siguen siendo **propuesta**: sin implementar.
 
 Alcance de esta fase (deliberadamente solo análisis y diseño): separar (A) topología/seeding del cuadro,
 (B) modelo de dominio y (C) UX para BJJ, sin introducir todavía ninguna remodelación de modelo ni
@@ -377,9 +377,21 @@ branding; habilitar `WRITE`; publicar resultados; tocar Access/DNS/Tunnel.
 
 ## 11bis. Ya hecho en F2 (§16)
 
-El seeding bye-aware y el scheduler estructural **dejaron de ser propuesta** en F2 (fork `8ec816b`,
-CI verde, imagen `8ec816b-r1` validada en aislado con `bracket_test`; **sin desplegar** ni migrar
-`tournament_id=6**). Detalle completo en `docs/19-bye-aware-seeding-and-scheduling.md`.
+El seeding bye-aware y el scheduler estructural **dejaron de ser propuesta** en F2 (fork `8ec816b`, CI
+verde, imagen `8ec816b-r1`) y están **desplegados en producción** (pin del submódulo `8ec816b`, recreado
+solo el servicio `bracket`; rollback documentado → `29b6146-r1`). Validados de punta a punta en un ensayo
+**nuevo y separado** (`tournament_id=9`: 25 entrants, categorías 3/2/6/7/2/5, 7 direct BYEs, 0 ghosts,
+resolver idempotente, 0 scores/ganadores ficticios, 10 candidatos reales en el marcador, 19 combates
+schedulable planificados y 7 `STRUCTURAL_BYE` sin planning). `tournament_id=6` queda **intacto** como
+*P2.8A historical rehearsal*. Detalle completo, terminología (`READY` / `PENDING_COMPETITIVE` /
+`STRUCTURAL_BYE` / `DEAD`, `SCHEDULABLE = READY + PENDING_COMPETITIVE`) y evidencia en
+`docs/19-bye-aware-seeding-and-scheduling.md` §3.1, §5ter y §8.
+
+Deuda funcional **explícita y no resuelta**: **UI AUTO-SEED GAP ⚠️** — el seeding bye-aware solo corre
+cuando los inscritos existen al construir el cuadro (importador / create-with-inputs); la UI estándar
+crea el `stage_item` con inputs vacíos y asigna equipos después, así que no dispara
+`distribute_entrants_into_slots`. Opciones y recomendación (C: acción UI explícita `Generate bracket`)
+en `docs/19` §6bis. No se implementa sin autorización.
 
 ## 12. Evidencia y artefactos
 
@@ -474,3 +486,25 @@ Publicada sin reconstruir y sin tocar `latest`:
   `pnpm_version=9.15.9`, `pnpm_lock_sha256=001f9b8e…`
 - `latest` con el mismo digest antes y después del push; el contenedor productivo no se ha recreado
   (sigue ejecutando la misma imagen).
+
+## 14. F2 — cierre (ENGINE + REHEARSAL VALIDATED ✅)
+
+Estado: **implementado, desplegado y validado** (2026-10-03). Detalle completo, terminología y
+evidencia en `docs/19-bye-aware-seeding-and-scheduling.md`.
+
+- Motor: fork `danyseve/bracket` `master` @ `8ec816b` (seeding bye-aware + scheduler estructural),
+  CI del fork **4/4 jobs en verde**, 170 tests / `mypy` 171 ficheros / `pylint` 10.00.
+- Entrega: pin del submódulo `8ec816b` en el repo principal e imagen
+  `danyseve1/bracket-bjj:8ec816b-r1` en producción (rollback documentado → `29b6146-r1`); recreado
+  **solo** el servicio `bracket` (postgres, bridge, scoreboard, nginx y wireguard sin reinicio).
+- Validación real (ensayo nuevo `tournament_id=9`, 25 entrants, categorías `3/2/6/7/2/5`, cuadros
+  `4/2/8/8/2/8`): **7 direct BYEs, 0 ghosts, 0 scores y 0 ganadores ficticios**; resolver estructural
+  P2.8A materializado e idempotente; marcador: 10 candidatos reales, `assign → ready (0-0, reloj sin
+  iniciar) → cancel → state null`, `POST result` → `503 result_write_disabled`; scheduler:
+  **19 planificados (10 `READY` + 9 `PENDING_COMPETITIVE`) y 7 `STRUCTURAL_BYE` sin planning**,
+  posiciones `0…18` contiguas, intervalos de 6 min, una sola pista (`Tatami 1`).
+- `tournament_id=6` **intacto** como *P2.8A historical rehearsal* (3 byes directos + 2 ghosts, 0 scores,
+  0 planning); torneos 1 y 2 intactos; `WRITE=false`; Tatami 1 `state=null`.
+- Semántica del scheduler aceptada por el operador: `READY` → planificado · `PENDING_COMPETITIVE` →
+  planificado · `STRUCTURAL_BYE` → **no** planificado · `DEAD`/ghost → **no** planificado.
+- Deuda restante: **UI AUTO-SEED GAP ⚠️** (§11bis). F3 no iniciada.

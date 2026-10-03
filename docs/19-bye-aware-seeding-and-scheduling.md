@@ -1,9 +1,10 @@
 # 19 — Seeding *bye-aware* y planificación estructural (P2.8B · F2)
 
-Estado: **P2.8B F2 — IMPLEMENTADA Y VALIDADA** (2026-10-03). Cambio **solo de motor + tests + CI** en el
-fork `danyseve/bracket` (`master`, HEAD `8ec816b`). Producción **sin migrar**: pin del submódulo
-`29b6146`, imagen productiva `danyseve1/bracket-bjj:29b6146-r1`, `tournament_id=6` intacto y
-`WRITE=false`. La decisión sobre el ensayo queda abierta (§8).
+Estado: **P2.8B F2 — ENGINE + REHEARSAL VALIDATED ✅** (2026-10-03). Cambio de motor + tests + CI en el
+fork `danyseve/bracket` (`master`, HEAD `8ec816b`) y **desplegado**: pin del submódulo `8ec816b`, imagen
+productiva `danyseve1/bracket-bjj:8ec816b-r1` (rollback documentado → `29b6146-r1`), `tournament_id=6`
+intacto como *P2.8A historical rehearsal* (0 scores, 0 planning) y `WRITE=false`. El ensayo nuevo es
+`tournament_id=9` (§5ter, §8). Deuda funcional explícita: **UI AUTO-SEED GAP ⚠️** (§6bis).
 
 Continúa a `docs/17-bye-auto-advance.md` (P2.8A: avance **aguas abajo**) y a
 `docs/18-bracket-topology-domain-model.md` §2–§4 (diseño **aguas arriba**: reparto de slots y
@@ -103,9 +104,28 @@ migración nueva:
 | `DEAD` | ningún slot posible (`∅/∅`) | **no** recibe planning |
 
 `structural.py:25` `MatchStructure`, `:31` `_classify`, `:39` `get_match_structures`, `:52`
-`get_playable_match_ids`. **PENDING no es un estado aparte**: un combate futuro cuyos dos feeders están
-vivos es `PLAYABLE` (es un combate futuro planificable); si un feeder está muerto, el combate pasa a
-`STRUCTURAL_BYE` o `DEAD` por la propia topología.
+`get_playable_match_ids`.
+
+### 3.1 Terminología (documentación y operación)
+
+El código mantiene el nombre `PLAYABLE` (renombrarlo sería ruido cosmético sin cambio de
+comportamiento), pero en la documentación y en la operación se distinguen **cuatro** estados, porque
+`PLAYABLE` sugiere "puede empezar ahora" y no significa eso:
+
+| Nombre | Definición | `MatchStructure` | ¿Recibe planning? |
+|---|---|---|---|
+| `READY` | ambos competidores ya determinados | `PLAYABLE` | sí |
+| `PENDING_COMPETITIVE` | falta conocer uno o ambos competidores, pero **sus feeders están vivos** y el combate existirá necesariamente como combate competitivo futuro | `PLAYABLE` | sí |
+| `STRUCTURAL_BYE` | avance sin combate (bye directo o walkover sobre una rama muerta) | `STRUCTURAL_BYE` | **no** |
+| `DEAD` / ghost | la rama no producirá ningún combate | `DEAD` | **no** |
+
+**`SCHEDULABLE` = `READY` + `PENDING_COMPETITIVE`**: es exactamente lo que `get_playable_match_ids`
+entrega al planner. `PENDING_COMPETITIVE` **no es un estado aparte del motor**: un combate futuro cuyos
+dos feeders están vivos es `PLAYABLE`; si un feeder está muerto, el combate pasa a `STRUCTURAL_BYE` o
+`DEAD` por la propia topología. Un `PENDING_COMPETITIVE` **sí puede reservar tatami/hora/posición**
+aunque todavía no se conozcan sus competidores: la rejilla del cuadro se planifica de una vez y el
+ganador de un feeder ocupará ese hueco cuando se resuelva. `STRUCTURAL_BYE` y `DEAD` nunca reservan
+nada (no son combates).
 
 ---
 
@@ -179,6 +199,60 @@ partidos `∅/∅`**, `STRUCTURAL_BYE == B − N`, los byes estructurales **sin*
 `0…n−1` contiguas). Cero scores ficticios. Los torneos `F2FIX-*` (ids 3–6 de `bracket_test`) quedan
 como evidencia y el fixture es idempotente (se borran y recrean solo esos torneos).
 
+### 5ter. Ensayo real nuevo (`tournament_id=9`) — validación de punta a punta
+
+Ensayo **nuevo y separado** (`tournament_id=6` no se tocó), creado con el dataset privado del club —
+**no** se copia el dataset ni PII al repo — con el importador del ensayo
+`scripts/rehearsal/rehearsal_import.py`. Ese importador se parcheó para usar el mismo reparto que el
+motor: (1) los equipos se colocan con `distribute_entrants_into_slots(...)` en lugar de ocupar los
+primeros slots, y (2) tras asignarlos se repite el resolver estructural de P2.8A
+(`update_inputs_in_complete_elimination_stage_item`), porque el cuadro se construye con los inputs
+todavía **vacíos** y en ese momento el avance de byes no tenía nada que resolver.
+
+| dato | valor |
+|---|---|
+| `tournament_id` | **9** (`Torneo Interno CREE Masculino — REHEARSAL F2`) |
+| entrants · categorías | 25 · `3 / 2 / 6 / 7 / 2 / 5` |
+| cuadros (B) | `4 / 2 / 8 / 8 / 2 / 8` |
+| stages / stage_items / inputs / matches | 6 / 6 / 32 / 26 |
+| pistas | 1 (`Tatami 1`) |
+| direct BYEs de 1ª ronda (`STRUCTURAL_BYE`) | **7** = B−N por categoría (`−62:1 · −66:0 · −71:2 · −77:1 · −84:0 · −92:3`) |
+| ghosts (`DEAD`) | **0** |
+| scores · ganadores ficticios | **0 · 0** |
+
+Resolver estructural P2.8A sobre el cuadro nuevo (sonda ejecutada **dentro** del contenedor con las
+funciones del propio motor — `get_dead_slots`,
+`get_inputs_to_update_in_subsequent_elimination_rounds`, `Match.get_winner`):
+
+- `pending_advances = 0` → todos los avances estructurales materializados; volver a ejecutar el resolver
+  no cambia nada (**idempotente**).
+- `matches_con_dos_slots_muertos = 0` → ninguna rama ghost/dead creada por el seeding nuevo.
+- 7 slots de rondas posteriores con equipo = los 7 byes avanzados **sin ningún resultado ni ganador
+  ficticio**.
+
+Marcador (Bridge `:8500` + marcador real de Tatami 1): `GET /tatamis/1/candidates?tournament_id=9` →
+**10** candidatos, todos con los dos `team_id` presentes (0 byes, 0 estructurales) y `active_match_id`
+nulo; `POST /tatamis/1/assign-match` → **201** con `status=ready`, `revision=1`, `remaining_seconds=300`
+(reloj sin iniciar) y puntos `0-0`; `cancel_assignment` → `state=null`; `POST /tatamis/1/result` →
+**503 `result_write_disabled`** (payload con campo extra → `422`). `BRACKET_RESULT_WRITE_ENABLED=false`.
+
+Scheduler (ejecutado desde la UI con el único mecanismo soportado,
+`POST /tournaments/{id}/schedule_matches` con JWT de sesión — `Depends(user_authenticated_for_tournament)`):
+
+| estado | matches | planning |
+|---|---|---|
+| `READY` | 10 | `court_id` + `start_time` + `position_in_schedule` |
+| `PENDING_COMPETITIVE` | 9 | `court_id` + `start_time` + `position_in_schedule` |
+| `STRUCTURAL_BYE` | 7 | **NULL** en los tres campos |
+| `DEAD` / ghost | 0 | — |
+| **total** | **26** | **19 planificados** |
+
+Comprobado además: posiciones **contiguas `0…18`** (19 valores, sin huecos); **18 deltas temporales,
+todos exactamente 6 min** (`duration_minutes=5` + `margin_minutes=1` del torneo) → orden estrictamente
+monotónico; **una sola pista** (`court_id=12` = `Tatami 1`); **0 scores** y **0 ganadores**. Conclusión:
+**ningún combate estructural consume tiempo de Tatami** — los 7 `STRUCTURAL_BYE` son exactamente los 7
+partidos sin planning. Criterio de aceptación y decisión del operador: §8.1.
+
 ---
 
 ## 6. Compatibilidad
@@ -190,7 +264,30 @@ como evidencia y el fixture es idempotente (se borran y recrean solo esos torneo
   walkovers se siguen resolviendo.
 - Sin cambios de esquema, `alembic`, contrato de API ni frontend. `is_playable` **no** se expone en la
   API: el Bridge ya filtra por "ambos `team_id` presentes" y no se ha tocado (§9 de la fase).
-- `tournament_id` 1, 2 y 6 quedan **sin tocar** (0 scores, 0 planning, 26 matches, 6 stages).
+- `tournament_id` 1, 2 y 6 quedan **sin tocar** (0 scores, 0 planning, 26 matches, 6 stages); `6` es
+  además el *P2.8A historical rehearsal*: topología antigua, 3 byes directos + 2 ghosts, 0 scores, 0
+  planning. El único torneo con planning es el ensayo nuevo `9` (§5ter).
+
+### 6bis. Deuda funcional — UI AUTO-SEED GAP ⚠️
+
+El reparto bye-aware corre **solo cuando los inscritos existen al construir el cuadro**:
+
+- **Importador / create-with-inputs**: ✅ el cuadro se construye con los inscritos ya repartidos
+  (`distribute_entrants_into_slots`), así que el seeding bye-aware se aplica automáticamente.
+- **UI estándar**: ⚠️ crea el `stage_item` con inputs **vacíos** (`routes/stage_items.py:96`,
+  `utils/db_init.py`) y añade los equipos **después** (`routes/stage_item_inputs.py`), de modo que
+  `determine_matches_first_round` empareja slots vacíos: la UI **no dispara** el seeding bye-aware y
+  vuelve a producir byes concentrados y ghosts `∅/∅`. El resolver estructural de P2.8A sigue salvando
+  el avance (ningún equipo queda bloqueado), pero el reparto no es el nuevo.
+
+**Estado: no implementado.** Opciones para la microfase siguiente:
+
+- **A) Endpoint explícito** `Seed bracket` (API) que reordene los slots del `stage_item`.
+- **B) Auto-seed al completar las inscripciones** (efecto lateral automático al quedar completo el cuadro).
+- **C) Acción UI `Generate bracket`** — explícita, reproducible y visible para el operador.
+
+Recomendación del operador: **C** (acción explícita y reproducible, sin efectos laterales ocultos). No
+se implementa sin nueva autorización.
 
 ---
 
@@ -214,26 +311,29 @@ re-etiquetado `latest` ni tocado `29b6146-r1`.
 
 ---
 
-## 8. Migración del ensayo (`tournament_id=6`) — DECISIÓN PENDIENTE
+## 8. Ensayo (`tournament_id=6` y `tournament_id=9`) — DECISIÓN EJECUTADA
 
-El ensayo se construyó con el reparto antiguo (3 byes directos + 2 ghosts). **No se ha re-seedeado
-nada.** Opciones, para decidir tras validar la lógica nueva:
+Decisión del operador: **C**. Se creó un ensayo P2.8B **nuevo y separado** (`tournament_id=9`, §5ter) y
+`tournament_id=6` **no se tocó**: queda como *P2.8A historical rehearsal* con su topología antigua
+(3 byes directos + 2 ghosts), 0 scores y 0 planning. No se re-seedeó ni se reescribió nada; los intentos
+intermedios del ensayo se revirtieron con `scripts/rehearsal/rehearsal_rollback.py`.
 
-- **A — Dejarlo como evidencia histórica de P2.8A.** Coste 0; el cuadro conserva 2 ghosts (que ya no
-  consumirán planning si algún día se planifica, gracias a §4).
-- **B — Recrear solo los `stage_item_inputs` del ensayo** (backup completo previo, validación fila a
-  fila, manteniendo participantes/categorías). Deja el ensayo "bonito" pero reescribe datos ya
-  auditados y exige re-resolver el árbol.
-- **C — Crear un ensayo P2.8B nuevo y separado** (3/5/6/7 inscritos) y dejar el 6 intacto. Compara
-  viejo vs nuevo sin tocar evidencia.
+### 8.1 Criterio de aceptación del scheduler (aclarado, no es un fallo de motor)
 
-Recomendación: **C** para la demostración y **A** para el histórico. No se ejecuta nada sin
-autorización.
+En el primer pase de validación de §7 apareció una discrepancia **de criterio, no de motor**: el criterio
+inicial esperaba que los 9 combates `PENDING_COMPETITIVE` (feeders vivos, competidores aún sin
+determinar) quedasen **sin** planning, mientras el motor sí se lo asignaba. Se verificó en el código que
+el motor hace lo documentado en §3 y §3.1 (`get_matches_to_schedule` → solo `PLAYABLE`), y el operador
+resolvió **aceptar la semántica F2**: `SCHEDULABLE = READY + PENDING_COMPETITIVE` reciben
+tatami/hora/posición; `STRUCTURAL_BYE` + `DEAD` no. Resultado real aceptado como correcto en
+`tournament_id=9`: **19 planificados (10 `READY` + 9 `PENDING_COMPETITIVE`) · 7 `STRUCTURAL_BYE` sin
+planning · 0 ghosts**.
 
 ---
 
 ## 9. No hacer (sigue fuera de alcance)
 
 Modelo de dominio Club/Competitor/Team/Entrant, labels contextuales, branding, Tatami 2–6, `WRITE`,
-Access/DNS/Tunnel, doble eliminación. Y en esta fase: **no** se bumpea el pin del submódulo, **no** se
-reconstruye la imagen productiva, **no** se despliega y **no** se toca `tournament_id=6`.
+Access/DNS/Tunnel, doble eliminación. F2 cierra con el pin del submódulo en `8ec816b`, la imagen
+`8ec816b-r1` en producción (rollback → `29b6146-r1`) y `tournament_id=6` intacto; **no** se implementa
+el `UI AUTO-SEED GAP` (§6bis), **no** se re-seedea ningún cuadro existente y **no** se inicia F3.
