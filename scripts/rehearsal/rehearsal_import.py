@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Importador del ensayo P2.7A — se ejecuta DENTRO del contenedor ``bracket``.
+"""Importador del ensayo P2.7A / P2.8B-F2 — se ejecuta DENTRO del contenedor ``bracket``.
+
+P2.8B-F2: los equipos se colocan en slots bye-aware con ``distribute_entrants_into_slots`` (la misma
+función pura que usa el motor), en lugar de ocupar los primeros slots y dejar los vacíos al final:
+así cada bye queda emparejado con un entrant real y no se crean matches ∅/∅.
 
 Usa los modelos del propio Bracket (sin HTTP y sin POST /api/token, §16):
 crea club, torneo, ranking, pista, jugadores, equipos, stages y stage_items, y
@@ -40,7 +44,11 @@ from dataset import (  # noqa: E402
 from zoneinfo import ZoneInfo  # noqa: E402
 
 from bracket.database import database  # noqa: E402
+from bracket.logic.ranking.elimination import (  # noqa: E402
+    update_inputs_in_complete_elimination_stage_item,
+)
 from bracket.logic.scheduling.builder import build_matches_for_stage_item  # noqa: E402
+from bracket.logic.scheduling.seeding import distribute_entrants_into_slots  # noqa: E402
 from bracket.models.db.club import ClubInsertable  # noqa: E402
 from bracket.models.db.court import CourtToInsert  # noqa: E402
 from bracket.models.db.player import PlayerToInsert  # noqa: E402
@@ -64,7 +72,7 @@ from bracket.schema import (  # noqa: E402
 from bracket.sql.players import insert_player  # noqa: E402
 from bracket.sql.rankings import get_default_rankings_in_tournament, sql_create_ranking  # noqa: E402
 from bracket.sql.stage_item_inputs import sql_set_team_id_for_stage_item_input  # noqa: E402
-from bracket.sql.stage_items import sql_create_stage_item_with_empty_inputs  # noqa: E402
+from bracket.sql.stage_items import get_stage_item, sql_create_stage_item_with_empty_inputs  # noqa: E402
 from bracket.sql.tournaments import sql_create_tournament  # noqa: E402
 from bracket.utils.id_types import ClubId, TournamentId  # noqa: E402
 from heliclockter import datetime_utc  # noqa: E402
@@ -149,6 +157,7 @@ async def import_tournament(args: argparse.Namespace, dataset: Any, plan: Any) -
     started = time.perf_counter()
     phases: dict[str, float] = {}
     ids: dict[str, Any] = {}
+    byes_by_category: dict[str, int] = {}
 
     club_id = await get_or_create_club(args.club_name, args.dry_run)
     ids["club_id"] = club_id
@@ -215,18 +224,37 @@ async def import_tournament(args: argparse.Namespace, dataset: Any, plan: Any) -
             )
             await build_matches_for_stage_item(stage_item, tournament_id)
 
+            bracket_size = plan.bracket_size(category)
             input_rows = await database.fetch_all(
                 query=stage_item_inputs.select()
                 .where(stage_item_inputs.c.stage_item_id == stage_item.id)
                 .order_by(stage_item_inputs.c.slot)
             )
-            if len(input_rows) != plan.bracket_size(category):
+            if len(input_rows) != bracket_size:
                 raise DatasetError(
-                    f"{category}: slots creados {len(input_rows)} != cuadro {plan.bracket_size(category)}"
+                    f"{category}: slots creados {len(input_rows)} != cuadro {bracket_size}"
                 )
 
-            # los byes (slots sin equipo) quedan al final del cuadro, sin inventar emparejamientos
-            for input_row, competitor in zip(input_rows[: len(members)], members, strict=True):
+            # P2.8B-F2 — reparto bye-aware: se usa la MISMA función pura que el motor para que cada
+            # bye quede emparejado con un entrant real (nunca ∅/∅). El índice i de la lista devuelta
+            # es el slot i+1 y los input_rows vienen ordenados por slot, así que el mapeo es directo.
+            try:
+                distribution = distribute_entrants_into_slots(list(members), bracket_size)
+            except ValueError as exc:
+                raise DatasetError(f"{category}: reparto bye-aware imposible: {exc}") from exc
+            if len(distribution) != len(input_rows):
+                raise DatasetError(
+                    f"{category}: reparto {len(distribution)} != inputs {len(input_rows)}"
+                )
+            if sum(competitor is not None for competitor in distribution) != len(members):
+                raise DatasetError(
+                    f"{category}: el reparto no coloca exactamente {len(members)} entrants"
+                )
+            byes_by_category[category] = sum(competitor is None for competitor in distribution)
+
+            for input_row, competitor in zip(input_rows, distribution, strict=True):
+                if competitor is None:
+                    continue
                 player_id = int(
                     await database.execute(
                         query=players.insert(),
@@ -258,9 +286,28 @@ async def import_tournament(args: argparse.Namespace, dataset: Any, plan: Any) -
                 await sql_set_team_id_for_stage_item_input(
                     tournament_id, input_row._mapping["id"], team_id
                 )
+            # P2.8B-F2 — materialización estructural P2.8A. El cuadro se construyó antes de asignar
+            # los equipos, así que la resolución que builder.py:75-79 hace al construir no tenía nada
+            # que avanzar; ya colocados los entrants en sus slots, se repite aquí la resolución del
+            # motor para que cada bye avance solo, sin ningún resultado ficticio.
+            await update_inputs_in_complete_elimination_stage_item(
+                await get_stage_item(tournament_id, stage_item.id)
+            )
             ids.setdefault("categories", {})[category] = round(time.perf_counter() - mark_cat, 3)
         phases["categorias_y_cuadros"] = time.perf_counter() - mark
 
+    # P2.8B-F2: el reparto bye-aware debe dar exactamente B-N byes por categoría y ningún ghost,
+    # lo que exige que ningún cuadro supere el doble de sus entrants (B <= 2N).
+    for category, size in plan.bracket_sizes().items():
+        entrant_count = len(plan.categories[category])
+        if size > 2 * entrant_count:
+            raise DatasetError(
+                f"{category}: cuadro de {size} para {entrant_count} entrants generaría ghosts"
+            )
+    if byes_by_category != plan.byes():
+        raise DatasetError(f"byes inesperados: {byes_by_category} != {plan.byes()}")
+
+    ids["byes_by_category"] = byes_by_category
     ids["structure"] = await structure_counts(int(ids["tournament_id"]))
     expected_structure = {
         "stages": len(plan.categories),
@@ -341,7 +388,7 @@ async def main_async(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Importador del ensayo P2.7A (dentro del contenedor bracket)")
+    parser = argparse.ArgumentParser(description="Importador del ensayo P2.7A/P2.8B (dentro del contenedor bracket)")
     parser.add_argument("--dataset", required=True, help="ruta al JSON del ensayo")
     parser.add_argument("--mode", choices=["real", "anonymized"], required=True)
     parser.add_argument("--tournament-name", default=REHEARSAL_TOURNAMENT_NAME)
