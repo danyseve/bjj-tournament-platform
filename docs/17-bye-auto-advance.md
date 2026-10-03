@@ -127,7 +127,14 @@ docker build -f docker/bracket-bjj/Dockerfile \
 | Guardas de la receta | bundle sin `http://localhost:8400/api`, `uv.lock` sin cambios, 0 ficheros world-writable |
 | Código dentro | `sha256` de `elimination.py` idéntico al repo; helpers presentes |
 | Migraciones | 22 ficheros, head `8f2b1c7d4a90` = head de la base de datos (**ninguna nueva**) |
-| Publicación | **no** subida al registro: build local (el despliegue usa la imagen local del host) |
+| Publicación | publicada en Docker Hub (`docker push`, 2026-10-03), tag `9bc58b3-r1`, sin `latest` |
+| Manifest digest remoto | `sha256:bed16308214f6cebddf5b01f06e461d944ea124804bdf291cc1e8ac596b5cf97` |
+| Image ID / config digest local | `sha256:344d907dacba33ede99c74437587c6662364c47a675b5dbbd278872ed206544f` |
+
+El *manifest digest* remoto y el *image ID* no coinciden porque son objetos distintos del formato de
+Docker Registry: el *image ID* es el digest del *config blob*, y el digest del tag es el sha256 del
+manifest que lo referencia. Se validó que el config blob remoto coincide exactamente con el image ID
+local (`rootfs.diff_ids` idénticos, 16/16).
 
 Validación previa a sustituir producción, en contenedor desechable **contra la DB de test aislada
 `bracket_test`** (nunca la de producción), sin tocar puertos públicos: `healthy` en 6 s, `/api/ping`
