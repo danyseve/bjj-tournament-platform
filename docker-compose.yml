@@ -33,7 +33,7 @@ services:
 
   bracket:
     # P2.8B-F2C — UI bracket generation (UI AUTO-SEED GAP RESOLVED). Imagen del fork @886ff13.
-    # Rollback: danyseve1/bracket-bjj:cbab68a-r1
+    # Rollback seguro: danyseve1/bracket-bjj:8ec816b-r1. F2C pre-i18n: cbab68a-r1 (no recomendado).
     image: danyseve1/bracket-bjj:886ff13-r1
     container_name: bracket
 #  bracket:
