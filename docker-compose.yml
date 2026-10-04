@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   bracket:
-    # P2.8B-F2 — seed bye-aware + scheduler estructural. Imagen del fork @8ec816b.
+    # P2.8B-F2C — UI bracket generation (UI AUTO-SEED GAP RESOLVED). Imagen del fork @886ff13.
     # Rollback: danyseve1/bracket-bjj:cbab68a-r1
     image: danyseve1/bracket-bjj:886ff13-r1
     container_name: bracket
